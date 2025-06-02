@@ -16,11 +16,11 @@ def entry_path(entry_id):
 # --- Firebase operations ---
 def load_data():
     res = requests.get(db_path())
+    st.write("GET status:", res.status_code)  # 👈 Add this
     if res.status_code == 200 and res.json():
         data = res.json()
         return [{**v, "id": k} for k, v in data.items()]
     return []
-
 def save_entry(truck_number, phone, status):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
