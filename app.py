@@ -1,106 +1,75 @@
 import streamlit as st
+import pandas as pd
 import requests
 from datetime import datetime
 
-# --- Firebase configuration from Streamlit secrets ---
-FIREBASE_URL = st.secrets["FIREBASE_URL"]
-SCM_PASSWORD = st.secrets["SCM_PASSWORD"]
+# --- Firebase Config ---
+FIREBASE_URL = st.secrets["FIREBASE_URL"]  # Add this to secrets.toml
 
-def db_path():
-    return f"{FIREBASE_URL}/trucks.json"
+# --- Page Config ---
+st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
+st.title("🚛 Nestlé Truck Monitoring System")
 
-def entry_path(entry_id):
-    return f"{FIREBASE_URL}/trucks/{entry_id}.json"
+# --- Login Form ---
+with st.sidebar.form("login_form"):
+    st.subheader("🔐 SCM Login")
+    password = st.text_input("Enter SCM password", type="password")
+    login_submit = st.form_submit_button("Submit")
+    is_scm = password == "nestle123" if login_submit else False
 
-def load_data():
-    res = requests.get(db_path())
-    st.write("GET status:", res.status_code)
+# --- Firebase Functions ---
+def fetch_data():
+    res = requests.get(f"{FIREBASE_URL}/trucks.json")
     if res.status_code == 200 and res.json():
         data = res.json()
-        return [{**v, "id": k} for k, v in data.items()]
+        data_list = [{"id": k, **v} for k, v in data.items()]
+        return data_list
     return []
 
-def save_entry(truck_number, phone, status):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    payload = {
-        "Truck Number": truck_number,
-        "Driver Phone": phone,
-        "Entry Time": timestamp,
-        "Status": status
-    }
-    res = requests.post(db_path(), json=payload)
-    st.write("POST status:", res.status_code)
-    st.write("POST response:", res.text)
-    return res.ok
+def post_data(truck_data):
+    requests.post(f"{FIREBASE_URL}/trucks.json", json=truck_data)
 
-def update_entry(entry_id, data):
-    res = requests.put(entry_path(entry_id), json=data)
-    return res.ok
+def update_data(entry_id, updated_data):
+    requests.patch(f"{FIREBASE_URL}/trucks/{entry_id}.json", json=updated_data)
 
-# --- Set up Streamlit page ---
-st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
-st.title("🚛 Nestlé Truck Status Monitor")
-
-# --- Manage login state using session ---
-if "is_scm" not in st.session_state:
-    st.session_state["is_scm"] = False
-
-with st.sidebar:
-    with st.form("login_form"):
-        st.subheader("🔐 SCM Login")
-        password = st.text_input("Enter SCM password", type="password")
-        submitted = st.form_submit_button("Login")
-
-        if submitted:
-            if password == SCM_PASSWORD:
-                st.session_state["is_scm"] = True
-                st.experimental_rerun()
-            else:
-                st.error("Incorrect password.")
-
-is_scm = st.session_state["is_scm"]
-
-# --- Load existing data (shown to all) ---
-data = load_data()
-
-# --- SCM Tools (if logged in) ---
+# --- SCM Section ---
 if is_scm:
     st.success("Logged in as SCM ✅")
-    st.subheader("➕ Add Truck Entry")
+    st.subheader("➕ Add or Update Truck Entry")
 
-    with st.form("add_truck"):
+    with st.form("entry_form"):
         truck_no = st.text_input("Truck Number")
         phone = st.text_input("Driver Phone")
         status = st.selectbox("Status", ["Inside", "Ready to Leave"])
-        save = st.form_submit_button("Submit")
+        submitted = st.form_submit_button("Submit")
 
-        if save:
-            if truck_no and phone:
-                result = save_entry(truck_no, phone, status)
-                st.write("Save result:", result)
-                if result:
-                    st.success("Truck saved.")
-                    st.experimental_rerun()
-                else:
-                    st.error("❌ Failed to save truck.")
+        if submitted and truck_no.strip():
+            entry_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            existing_data = fetch_data()
+
+            existing = next((entry for entry in existing_data if entry["Truck Number"] == truck_no), None)
+
+            new_data = {
+                "Truck Number": truck_no,
+                "Driver Phone": phone,
+                "Status": status,
+                "Entry Time": entry_time
+            }
+
+            if existing:
+                update_data(existing["id"], new_data)
+                st.success("Truck updated successfully.")
             else:
-                st.warning("Truck Number and Phone required.")
+                post_data(new_data)
+                st.success("Truck added successfully.")
+            st.rerun()
 
-    st.subheader("🛠️ Edit Existing Entries")
-    for item in data:
-        with st.expander(f"Truck: {item['Truck Number']}"):
-            new_phone = st.text_input(f"Phone ({item['id']})", item["Driver Phone"], key=item["id"] + "phone")
-            new_status = st.selectbox("Status", ["Inside", "Ready to Leave"], index=0 if item["Status"] == "Inside" else 1, key=item["id"] + "status")
-            if st.button("💾 Update", key=item["id"] + "save"):
-                item["Driver Phone"] = new_phone
-                item["Status"] = new_status
-                if update_entry(item["id"], item):
-                    st.success("Updated.")
-                    st.experimental_rerun()
+# --- Display Live Table for All ---
+st.subheader("📋 Current Truck Status (Live View)")
 
-# --- Public View for All Users ---
-st.subheader("📋 Live Truck Dashboard")
-if data:
-    st.dataframe([{k: v for k, v in i.items() if k != "id"} for i in data], use_container_width=True)
+fetched_data = fetch_data()
+if fetched_data:
+    df = pd.DataFrame([{k: str(v) for k, v in entry.items() if k != "id"} for entry in fetched_data])
+    st.dataframe(df, use_container_width=True)
 else:
-    st.info("No entries yet.")
+    st.info("No truck entries yet.")
