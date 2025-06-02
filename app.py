@@ -30,7 +30,10 @@ def save_entry(truck_number, phone, status):
         "Status": status
     }
     res = requests.post(db_path(), json=payload)
+    st.write("POST status:", res.status_code)
+    st.write("POST response:", res.text)
     return res.ok
+
 
 def update_entry(entry_id, data):
     res = requests.put(entry_path(entry_id), json=data)
