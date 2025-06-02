@@ -18,7 +18,7 @@ def save_data(df):
 
 # --- Page Setup ---
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
-st.title("🚛 Nestlé Truck Monitoring System")
+st.title("🚛 Nestlé Truck-Monitoring System")
 
 # --- Login Form ---
 with st.sidebar.form("login_form"):
