@@ -1,65 +1,91 @@
 import streamlit as st
-import pandas as pd
-import os
+import requests
 from datetime import datetime
+import os
 
-# --- Constants ---
-CSV_FILE = "trucks.csv"
-SCM_PASSWORD = "nestle123"  # hardcoded for now
+# Firebase config from secrets
+FIREBASE_URL = st.secrets["FIREBASE_URL"]
+API_KEY = st.secrets["API_KEY"]
+SCM_PASSWORD = st.secrets["SCM_PASSWORD"]
 
-# --- Load/Save Data ---
+# Helper: Get full path for REST API
+def db_path():
+    return f"{FIREBASE_URL}/trucks.json?auth={API_KEY}"
+
+# Load truck entries
 def load_data():
-    if not os.path.exists(CSV_FILE):
-        return pd.DataFrame(columns=["Truck Number", "Driver Phone", "Entry Time", "Status"])
-    return pd.read_csv(CSV_FILE)
+    res = requests.get(db_path())
+    if res.status_code == 200 and res.json():
+        data = res.json()
+        return [{**v, "id": k} for k, v in data.items()]
+    return []
 
-def save_data(df):
-    df.to_csv(CSV_FILE, index=False)
+# Save or update truck entry
+def save_entry(truck_number, phone, status):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = {
+        "Truck Number": truck_number,
+        "Driver Phone": phone,
+        "Entry Time": timestamp,
+        "Status": status
+    }
+    res = requests.post(db_path(), json=payload)
+    return res.ok
 
-# --- Page Setup ---
+# Update a specific entry (used by SCM editor)
+def update_entry(entry_id, data):
+    url = f"{FIREBASE_URL}/trucks/{entry_id}.json?auth={API_KEY}"
+    res = requests.put(url, json=data)
+    return res.ok
+
+# Page UI
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
-st.title("🚛 Nestlé Truck-Monitoring System")
+st.title("🚛 Nestlé Truck Status Monitor")
 
-# --- Login Form ---
+# Login
 with st.sidebar.form("login_form"):
     st.subheader("🔐 SCM Login")
-    entered_password = st.text_input("Enter SCM password", type="password")
-    login_submit = st.form_submit_button("Login")
+    password = st.text_input("Enter SCM password", type="password")
+    login = st.form_submit_button("Login")
 
-is_scm = (entered_password == SCM_PASSWORD) if login_submit else False
+is_scm = password == SCM_PASSWORD if login else False
+data = load_data()
 
-# --- Load and Display Data ---
-df = load_data()
-
-# --- SCM Add or Edit Entries ---
+# SCM section
 if is_scm:
     st.success("Logged in as SCM ✅")
-    st.subheader("➕ Add or Edit Truck Entry")
+    st.subheader("➕ Add New Truck")
 
-    with st.form("edit_form"):
+    with st.form("new_entry"):
         truck_no = st.text_input("Truck Number")
         phone = st.text_input("Driver Phone")
         status = st.selectbox("Status", ["Inside", "Ready to Leave"])
-        submitted = st.form_submit_button("Submit")
+        submit = st.form_submit_button("Submit")
 
-        if submitted and truck_no.strip():
-            entry_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            match = df["Truck Number"] == truck_no
-            if match.any():
-                df.loc[match, ["Driver Phone", "Status", "Entry Time"]] = [phone, status, entry_time]
-                st.success("Truck updated successfully.")
-            else:
-                df.loc[len(df.index)] = [truck_no, phone, entry_time, status]
-                st.success("Truck added successfully.")
-            save_data(df)
+        if submit:
+            if truck_no and phone:
+                if save_entry(truck_no, phone, status):
+                    st.success("Truck entry saved.")
+                    st.experimental_rerun()
+                else:
+                    st.error("Failed to save entry.")
 
     st.subheader("🛠️ Edit Existing Entries")
-    edited_df = st.data_editor(df, num_rows="dynamic", key="editable")
-    if st.button("💾 Save Changes"):
-        save_data(edited_df)
-        st.success("Changes saved successfully.")
-        st.experimental_rerun()
 
-# --- View for Everyone ---
-st.subheader("📋 Current Truck Status (Live View)")
-st.dataframe(df, use_container_width=True)
+    for item in data:
+        with st.expander(f"Truck: {item['Truck Number']}"):
+            new_phone = st.text_input(f"Phone ({item['id']})", item["Driver Phone"], key=item["id"]+"phone")
+            new_status = st.selectbox("Status", ["Inside", "Ready to Leave"], index=0 if item["Status"] == "Inside" else 1, key=item["id"]+"status")
+            if st.button("💾 Update", key=item["id"]+"save"):
+                item["Driver Phone"] = new_phone
+                item["Status"] = new_status
+                if update_entry(item["id"], item):
+                    st.success("Updated successfully.")
+                    st.experimental_rerun()
+
+# Public View
+st.subheader("📋 Live Truck Dashboard")
+if data:
+    st.dataframe([{k: v for k, v in i.items() if k != "id"} for i in data], use_container_width=True)
+else:
+    st.info("No entries yet.")
