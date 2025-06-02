@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from config import SCM_PASSWORD
+SCM_PASSWORD = "nestle123"
 
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 
