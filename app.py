@@ -1,18 +1,19 @@
 import streamlit as st
 import requests
 from datetime import datetime
-import os
 
-# Firebase config from secrets
+# Load credentials from secrets
 FIREBASE_URL = st.secrets["FIREBASE_URL"]
-API_KEY = st.secrets["API_KEY"]
 SCM_PASSWORD = st.secrets["SCM_PASSWORD"]
 
-# Helper: Get full path for REST API
+# --- Firebase paths ---
 def db_path():
-    return f"{FIREBASE_URL}/trucks.json?auth={API_KEY}"
+    return f"{FIREBASE_URL}/trucks.json"
 
-# Load truck entries
+def entry_path(entry_id):
+    return f"{FIREBASE_URL}/trucks/{entry_id}.json"
+
+# --- Firebase operations ---
 def load_data():
     res = requests.get(db_path())
     if res.status_code == 200 and res.json():
@@ -20,7 +21,6 @@ def load_data():
         return [{**v, "id": k} for k, v in data.items()]
     return []
 
-# Save or update truck entry
 def save_entry(truck_number, phone, status):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
@@ -32,17 +32,15 @@ def save_entry(truck_number, phone, status):
     res = requests.post(db_path(), json=payload)
     return res.ok
 
-# Update a specific entry (used by SCM editor)
 def update_entry(entry_id, data):
-    url = f"{FIREBASE_URL}/trucks/{entry_id}.json?auth={API_KEY}"
-    res = requests.put(url, json=data)
+    res = requests.put(entry_path(entry_id), json=data)
     return res.ok
 
-# Page UI
+# --- Streamlit UI ---
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚛 Nestlé Truck Status Monitor")
 
-# Login
+# --- SCM Login ---
 with st.sidebar.form("login_form"):
     st.subheader("🔐 SCM Login")
     password = st.text_input("Enter SCM password", type="password")
@@ -51,7 +49,7 @@ with st.sidebar.form("login_form"):
 is_scm = password == SCM_PASSWORD if login else False
 data = load_data()
 
-# SCM section
+# --- SCM Tools ---
 if is_scm:
     st.success("Logged in as SCM ✅")
     st.subheader("➕ Add New Truck")
@@ -83,7 +81,7 @@ if is_scm:
                     st.success("Updated successfully.")
                     st.experimental_rerun()
 
-# Public View
+# --- Public View ---
 st.subheader("📋 Live Truck Dashboard")
 if data:
     st.dataframe([{k: v for k, v in i.items() if k != "id"} for i in data], use_container_width=True)
