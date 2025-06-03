@@ -1,52 +1,82 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Nestlé Truck-Monitor", layout="wide")
+# ----------------------------
+# CONFIGURATION
+# ----------------------------
+SCM_PASSWORD = "scm2025"
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1W9LecXoIscTZ1okRPOe_gYUUN_-L8Jrvmgp8rU93Ma0/edit"
 
-# Setup Google Sheets API
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("gcreds.json", scope)
+# ----------------------------
+# GOOGLE SHEETS AUTH
+# ----------------------------
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+creds = Credentials.from_service_account_file("gcreds.json", scopes=scope)
 client = gspread.authorize(creds)
+sheet = client.open_by_url(GOOGLE_SHEET_URL)
+worksheet = sheet.sheet1
 
-sheet_url = "https://docs.google.com/spreadsheets/d/1W9LecXoIscTZ1okRPOe_gYUUN_-L8Jrvmgp8rU93Ma0/edit"
-spreadsheet = client.open_by_url(sheet_url)
-worksheet = spreadsheet.sheet1
+# ----------------------------
+# STREAMLIT SETUP
+# ----------------------------
+st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
+st.title("🚛 Nestlé Truck Monitoring System")
 
-# --- SCM Password ---
-st.sidebar.header("🔐 SCM Login")
-password = st.sidebar.text_input("Enter SCM Password", type="password")
-scm_logged_in = st.sidebar.button("Submit")
+# ----------------------------
+# SIDEBAR LOGIN
+# ----------------------------
+with st.sidebar:
+    st.subheader("🔐 SCM Login")
+    password = st.text_input("Enter SCM password", type="password")
+    if st.button("Submit") and password == SCM_PASSWORD:
+        st.session_state.logged_in = True
 
-if scm_logged_in and password == "scm2025":
-    st.success("Logged in as SCM Staff")
-    # --- Add Truck Entry Form ---
-    st.header("🚛 Add New Truck Entry")
-    truck_number = st.text_input("Truck Number")
-    driver_number = st.text_input("Driver Phone Number")
-    entry_time = st.text_input("Entry Time (HH:MM format)")
+# ----------------------------
+# DATA HANDLING
+# ----------------------------
+def fetch_data():
+    data = worksheet.get_all_records()
+    return pd.DataFrame(data)
 
-    if st.button("Add Entry"):
-        worksheet.append_row([truck_number, driver_number, entry_time, "Inside"])
-        st.success("✅ Entry added successfully")
+def add_or_update_entry(truck_no, driver_phone, status):
+    df = fetch_data()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if truck_no in df["Truck Number"].values:
+        row = df[df["Truck Number"] == truck_no].index[0] + 2  # +2 because gspread is 1-indexed and row 1 is header
+        worksheet.update(f"B{row}:D{row}", [[driver_phone, status, now]])
+    else:
+        worksheet.append_row([truck_no, driver_phone, status, now])
 
-    # --- Edit Table View ---
-    st.header("📋 Live Dashboard (Editable)")
-    df = pd.DataFrame(worksheet.get_all_records())
-    edited_df = st.data_editor(df, num_rows="dynamic")
+# ----------------------------
+# IF LOGGED IN
+# ----------------------------
+if st.session_state.get("logged_in", False):
+    st.success("Logged in as SCM ✅")
 
-    if st.button("Update Table"):
-        worksheet.clear()
-        worksheet.append_rows([edited_df.columns.values.tolist()] + edited_df.values.tolist())
-        st.success("✅ Google Sheet updated successfully")
+    with st.form("entry_form"):
+        st.subheader("➕ Add or Update Truck Entry")
+        truck_no = st.text_input("Truck Number")
+        phone = st.text_input("Driver Phone")
+        status = st.selectbox("Status", ["Inside", "Ready to Leave"])
+        submitted = st.form_submit_button("Submit")
 
+        if submitted and truck_no.strip() and phone.strip():
+            add_or_update_entry(truck_no.strip(), phone.strip(), status)
+            st.success(f"✅ Entry for {truck_no} saved.")
+            st.experimental_rerun()
+
+# ----------------------------
+# LIVE TABLE VIEW
+# ----------------------------
+st.subheader("📋 Current Truck Status (Live View)")
+data_df = fetch_data()
+if data_df.empty:
+    st.info("No truck entries yet.")
 else:
-    st.warning("Enter password to login as SCM.")
-    st.header("📋 Live Dashboard (Read-Only)")
-    try:
-        df = pd.DataFrame(worksheet.get_all_records())
-        st.dataframe(df)
-    except Exception as e:
-        st.error("Error loading data.")
-        st.exception(e)
+    st.dataframe(data_df, use_container_width=True)
