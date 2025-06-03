@@ -1,82 +1,54 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+import pandas as pd
 
-# ----------------------------
-# CONFIGURATION
-# ----------------------------
-SCM_PASSWORD = "scm2025"
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1W9LecXoIscTZ1okRPOe_gYUUN_-L8Jrvmgp8rU93Ma0/edit"
-
-# ----------------------------
-# GOOGLE SHEETS AUTH
-# ----------------------------
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-creds = Credentials.from_service_account_file("gcreds.json", scopes=scope)
-client = gspread.authorize(creds)
-sheet = client.open_by_url(GOOGLE_SHEET_URL)
-worksheet = sheet.sheet1
-
-# ----------------------------
-# STREAMLIT SETUP
-# ----------------------------
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
-st.title("🚛 Nestlé Truck Monitoring System")
 
-# ----------------------------
-# SIDEBAR LOGIN
-# ----------------------------
-with st.sidebar:
-    st.subheader("🔐 SCM Login")
-    password = st.text_input("Enter SCM password", type="password")
-    if st.button("Submit") and password == SCM_PASSWORD:
-        st.session_state.logged_in = True
+# Title
+st.title("🚛 Nestlé Truck Monitoring Dashboard")
 
-# ----------------------------
-# DATA HANDLING
-# ----------------------------
-def fetch_data():
-    data = worksheet.get_all_records()
-    return pd.DataFrame(data)
+# Load credentials and authorize
+credentials = Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+client = gspread.authorize(credentials)
 
-def add_or_update_entry(truck_no, driver_phone, status):
-    df = fetch_data()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if truck_no in df["Truck Number"].values:
-        row = df[df["Truck Number"] == truck_no].index[0] + 2  # +2 because gspread is 1-indexed and row 1 is header
-        worksheet.update(f"B{row}:D{row}", [[driver_phone, status, now]])
-    else:
-        worksheet.append_row([truck_no, driver_phone, status, now])
+# Access the Google Sheet
+sheet_url = st.secrets["GOOGLE_SHEET_URL"]
+sheet = client.open_by_url(sheet_url)
 
-# ----------------------------
-# IF LOGGED IN
-# ----------------------------
-if st.session_state.get("logged_in", False):
-    st.success("Logged in as SCM ✅")
+# Display sheet names
+worksheet_names = [ws.title for ws in sheet.worksheets()]
+selected_ws = st.sidebar.selectbox("Select a worksheet to view/edit:", worksheet_names)
+worksheet = sheet.worksheet(selected_ws)
 
-    with st.form("entry_form"):
-        st.subheader("➕ Add or Update Truck Entry")
-        truck_no = st.text_input("Truck Number")
-        phone = st.text_input("Driver Phone")
-        status = st.selectbox("Status", ["Inside", "Ready to Leave"])
-        submitted = st.form_submit_button("Submit")
+# Load sheet data into DataFrame
+data = worksheet.get_all_records()
+df = pd.DataFrame(data)
 
-        if submitted and truck_no.strip() and phone.strip():
-            add_or_update_entry(truck_no.strip(), phone.strip(), status)
-            st.success(f"✅ Entry for {truck_no} saved.")
-            st.experimental_rerun()
+# Display DataFrame
+st.subheader(f"📄 Data from: {selected_ws}")
+st.dataframe(df)
 
-# ----------------------------
-# LIVE TABLE VIEW
-# ----------------------------
-st.subheader("📋 Current Truck Status (Live View)")
-data_df = fetch_data()
-if data_df.empty:
-    st.info("No truck entries yet.")
-else:
-    st.dataframe(data_df, use_container_width=True)
+# Optional: Basic stats or filters
+if not df.empty:
+    st.markdown(f"**Total Rows:** {len(df)}")
+    if "Status" in df.columns:
+        st.markdown("**Status Breakdown:**")
+        st.write(df["Status"].value_counts())
+
+# Add new entry (SCM team can use this)
+st.subheader("➕ Add New Entry")
+with st.form("entry_form"):
+    col1, col2 = st.columns(2)
+    truck_no = col1.text_input("Truck Number")
+    driver_contact = col2.text_input("Driver Contact")
+    status = st.selectbox("Status", ["Inside", "Ready to Leave", "Dispatched"])
+    submit = st.form_submit_button("Submit")
+
+    if submit:
+        worksheet.append_row([truck_no, driver_contact, status])
+        st.success("Entry added successfully. Please refresh to see updates.")
+
+# Footer
+st.markdown("---")
+st.caption("Built for Nestlé SCM monitoring | Powered by Streamlit + Google Sheets")
