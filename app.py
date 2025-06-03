@@ -3,10 +3,10 @@ import pandas as pd
 import datetime
 from config import get_user_role
 
-# File path for the CSV
+# CSV path
 CSV_FILE = "trucks.csv"
 
-# Load or create the CSV
+# Load and Save
 def load_data():
     try:
         return pd.read_csv(CSV_FILE)
@@ -18,63 +18,55 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# UI starts here
+# Streamlit config
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Login for role
-password = st.text_input("Enter your access password:", type="password")
-role = get_user_role(password)
+# Login Section
+st.info("🔒 SCM editors can log in to update truck status.")
+password = st.text_input("Enter SCM password to enable editing (optional):", type="password")
+login_btn = st.button("Login as SCM")
 
-if not role:
-    st.warning("Please enter a valid password.")
-    st.stop()
+role = get_user_role(password) if login_btn else "Viewer"
 
-st.success(f"Logged in as: {role}")
+if role == "Viewer":
+    st.success("Viewer mode: Read-only access enabled.")
+elif role == "SCM":
+    st.success("SCM mode: Editing access enabled.")
 
-# Load CSV data
+# Load data
 df = load_data()
 
-# ========== SCM UI ==========
+# ==================== SCM MODE ====================
 if role == "SCM":
-    st.subheader("📥 Add / Update Truck Status")
+    st.subheader("📝 Edit Truck Data")
 
-    with st.form("truck_form"):
-        truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
-        driver_phone = st.text_input("Driver Phone")
-        entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
-        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+    # Allow editing the table directly
+    edited_df = st.data_editor(df, use_container_width=True, key="edit_table")
 
-        submitted = st.form_submit_button("Submit")
+    if st.button("Save Changes"):
+        # Ask if user wants to auto-remove trucks marked as Left
+        left_trucks = edited_df[edited_df["Status"] == "Left (✅)"]
 
-        if submitted:
-            new_entry = {
-                "Truck Number": truck_number,
-                "Driver Phone": driver_phone,
-                "Entry Time": entry_time.strftime("%H:%M"),
-                "Status": status,
-                "Updated By": "SCM"
-            }
+        if not left_trucks.empty:
+            confirm_removal = st.checkbox("Remove trucks marked as 'Left (✅)'?", value=True)
+            if confirm_removal:
+                st.warning(f"{len(left_trucks)} trucks marked 'Left (✅)' will be removed.")
+                if st.button("Confirm Removal"):
+                    edited_df = edited_df[edited_df["Status"] != "Left (✅)"]
+                    st.success(f"Removed {len(left_trucks)} truck(s).")
 
-            existing_index = df[df["Truck Number"] == truck_number].index
+        save_data(edited_df)
+        st.success("Changes saved.")
 
-            if not existing_index.empty:
-                df.loc[existing_index[0]] = new_entry
-                st.info("Truck entry updated.")
-            else:
-                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                st.success("New truck entry added.")
-
-            save_data(df)
-
-# ========== Viewer UI ==========
+# ==================== ALL USERS ====================
 st.subheader("📋 Current Truck Status")
 
 if df.empty:
     st.info("No truck data available yet.")
 else:
     st.dataframe(df.style.applymap(
-        lambda val: 'background-color: #FFF176' if "🟡" in val else 
+        lambda val: 'background-color: #FFF176' if "🟡" in val else
                     'background-color: #81C784' if "🟢" in val else
                     'background-color: #B2DFDB' if "✅" in val else '',
         subset=["Status"]
