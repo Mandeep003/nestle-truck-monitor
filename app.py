@@ -1,46 +1,87 @@
 import streamlit as st
 import pandas as pd
-from google.oauth2.service_account import Credentials
-import gspread
+import datetime
+from config import get_user_role
 
-# Title
-st.set_page_config(page_title="🚛 Nestlé Truck Monitoring Dashboard", layout="wide")
-st.title("🚛 Nestlé Truck Monitoring Dashboard")
+# File path for the CSV
+CSV_FILE = "trucks.csv"
 
-# Authenticate with Google Sheets using correct scope
-scope = ["https://www.googleapis.com/auth/spreadsheets"]
-credentials = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=scope
-)
+# Load or create the CSV
+def load_data():
+    try:
+        return pd.read_csv(CSV_FILE)
+    except FileNotFoundError:
+        df = pd.DataFrame(columns=["Truck Number", "Driver Phone", "Entry Time", "Status", "Updated By"])
+        df.to_csv(CSV_FILE, index=False)
+        return df
 
-client = gspread.authorize(credentials)
+def save_data(df):
+    df.to_csv(CSV_FILE, index=False)
 
-# Access the Google Sheet
-sheet_url = st.secrets["GOOGLE_SHEET_URL"]
-sheet = client.open_by_url(sheet_url)
+# UI starts here
+st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
+st.title("🚚 Nestlé Truck Monitoring System")
 
-# Display sheet names
-worksheet_names = [ws.title for ws in sheet.worksheets()]
-selected_sheet = st.selectbox("Select a sheet to view:", worksheet_names)
+# Login for role
+password = st.text_input("Enter your access password:", type="password")
+role = get_user_role(password)
 
-# Load selected worksheet into a dataframe
-worksheet = sheet.worksheet(selected_sheet)
-data = pd.DataFrame(worksheet.get_all_records())
+if not role:
+    st.warning("Please enter a valid password.")
+    st.stop()
 
-# Display table
-st.subheader(f"📄 Data from Sheet: {selected_sheet}")
-st.dataframe(data, use_container_width=True)
+st.success(f"Logged in as: {role}")
 
-# Optional: Basic filtering or other features
-with st.expander("🔍 Filter Data (Optional)"):
-    search_text = st.text_input("Search for a truck number or driver:")
-    if search_text:
-        filtered_data = data[
-            data.apply(lambda row: row.astype(str).str.contains(search_text, case=False).any(), axis=1)
-        ]
-        st.dataframe(filtered_data, use_container_width=True)
+# Load CSV data
+df = load_data()
 
-# Footer
-st.markdown("---")
-st.markdown("Built by Mandeep Bawa | Nestlé SCM Intern")
+# ========== SCM UI ==========
+if role == "SCM":
+    st.subheader("📥 Add / Update Truck Status")
+
+    with st.form("truck_form"):
+        truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
+        driver_phone = st.text_input("Driver Phone")
+        entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
+        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+
+        submitted = st.form_submit_button("Submit")
+
+        if submitted:
+            new_entry = {
+                "Truck Number": truck_number,
+                "Driver Phone": driver_phone,
+                "Entry Time": entry_time.strftime("%H:%M"),
+                "Status": status,
+                "Updated By": "SCM"
+            }
+
+            existing_index = df[df["Truck Number"] == truck_number].index
+
+            if not existing_index.empty:
+                df.loc[existing_index[0]] = new_entry
+                st.info("Truck entry updated.")
+            else:
+                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+                st.success("New truck entry added.")
+
+            save_data(df)
+
+# ========== Viewer UI ==========
+st.subheader("📋 Current Truck Status")
+
+if df.empty:
+    st.info("No truck data available yet.")
+else:
+    st.dataframe(df.style.applymap(
+        lambda val: 'background-color: #FFF176' if "🟡" in val else 
+                    'background-color: #81C784' if "🟢" in val else
+                    'background-color: #B2DFDB' if "✅" in val else '',
+        subset=["Status"]
+    ))
+
+    with st.expander("🔍 Filter Options", expanded=False):
+        search_truck = st.text_input("Search by Truck Number")
+        if search_truck:
+            filtered_df = df[df["Truck Number"].str.contains(search_truck, case=False)]
+            st.dataframe(filtered_df if not filtered_df.empty else "No matching trucks.")
