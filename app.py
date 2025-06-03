@@ -3,8 +3,8 @@ import pandas as pd
 import requests
 from datetime import datetime
 
-# --- Firebase Config ---
-FIREBASE_URL = st.secrets["FIREBASE_URL"]  # Add this to secrets.toml
+# --- Firebase Setup from secrets ---
+FIREBASE_URL = st.secrets["FIREBASE_URL"]  # e.g. "https://your-project.firebaseio.com"
 
 # --- Page Config ---
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
@@ -17,22 +17,29 @@ with st.sidebar.form("login_form"):
     login_submit = st.form_submit_button("Submit")
     is_scm = password == "nestle123" if login_submit else False
 
-# --- Firebase Functions ---
+# --- Firebase Helpers ---
 def fetch_data():
-    res = requests.get(f"{FIREBASE_URL}/trucks.json")
-    if res.status_code == 200 and res.json():
-        data = res.json()
-        data_list = [{"id": k, **v} for k, v in data.items()]
-        return data_list
+    try:
+        res = requests.get(f"{FIREBASE_URL}/trucks.json")
+        st.write("🟢 GET status:", res.status_code)
+        if res.status_code == 200 and res.json():
+            raw = res.json()
+            return [{"id": k, **v} for k, v in raw.items()]
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
     return []
 
 def post_data(truck_data):
-    requests.post(f"{FIREBASE_URL}/trucks.json", json=truck_data)
+    try:
+        res = requests.post(f"{FIREBASE_URL}/trucks.json", json=truck_data)
+        st.write("🔁 POST status:", res.status_code)
+        st.write("🔁 POST response:", res.text)
+        return res.ok
+    except Exception as e:
+        st.error(f"Error posting data: {e}")
+        return False
 
-def update_data(entry_id, updated_data):
-    requests.patch(f"{FIREBASE_URL}/trucks/{entry_id}.json", json=updated_data)
-
-# --- SCM Section ---
+# --- SCM Dashboard (after login) ---
 if is_scm:
     st.success("Logged in as SCM ✅")
     st.subheader("➕ Add or Update Truck Entry")
@@ -43,33 +50,33 @@ if is_scm:
         status = st.selectbox("Status", ["Inside", "Ready to Leave"])
         submitted = st.form_submit_button("Submit")
 
-        if submitted and truck_no.strip():
-            entry_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            existing_data = fetch_data()
+        if submitted:
+            st.write("🟢 Form submitted.")
+            if truck_no.strip() and phone.strip():
+                entry_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                truck_data = {
+                    "Truck Number": truck_no,
+                    "Driver Phone": phone,
+                    "Status": status,
+                    "Entry Time": entry_time
+                }
 
-            existing = next((entry for entry in existing_data if entry["Truck Number"] == truck_no), None)
-
-            new_data = {
-                "Truck Number": truck_no,
-                "Driver Phone": phone,
-                "Status": status,
-                "Entry Time": entry_time
-            }
-
-            if existing:
-                update_data(existing["id"], new_data)
-                st.success("Truck updated successfully.")
+                st.json(truck_data)
+                result = post_data(truck_data)
+                if result:
+                    st.success("✅ Truck entry saved.")
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to save truck entry.")
             else:
-                post_data(new_data)
-                st.success("Truck added successfully.")
-            st.rerun()
+                st.warning("Please enter both Truck Number and Phone.")
 
-# --- Display Live Table for All ---
+# --- Public View (everyone sees this) ---
 st.subheader("📋 Current Truck Status (Live View)")
+data = fetch_data()
 
-fetched_data = fetch_data()
-if fetched_data:
-    df = pd.DataFrame([{k: str(v) for k, v in entry.items() if k != "id"} for entry in fetched_data])
+if data:
+    df = pd.DataFrame([{k: str(v) for k, v in row.items() if k != "id"} for row in data])
     st.dataframe(df, use_container_width=True)
 else:
     st.info("No truck entries yet.")
