@@ -3,7 +3,7 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
+st.set_page_config(page_title="Nestlé Truck-Monitor", layout="wide")
 
 # Setup Google Sheets API
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -34,7 +34,7 @@ if scm_logged_in and password == "scm2025":
     # --- Edit Table View ---
     st.header("📋 Live Dashboard (Editable)")
     df = pd.DataFrame(worksheet.get_all_records())
-    edited_df = st.experimental_data_editor(df, num_rows="dynamic")
+    edited_df = st.data_editor(df, num_rows="dynamic")
 
     if st.button("Update Table"):
         worksheet.clear()

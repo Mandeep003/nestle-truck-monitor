@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "nestletruckmonitor-461804",
+  "private_key_id": "b080a023f9055ebec59f1f00e2c3ad8524e00022",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCaEm3Thm3l/A74\nRsw46YBbsbK5aF+ATGaQI4zl/tvEL0zjLEXzCxl/dZoOQeWJYnFbQWVWqRBtObJG\n/D8pPeDQKAaJchrvQtN9ysblFTQuKW6312fWl8+zeR20yI167x58PE8OSwHXgm8S\nTbNuTgyrmuGh0ymjgjwdyIkqk9Pm561nyj5K+vZVuraEXzEE00zwRv4MCksn1pDy\nheOtg2DSPmv+o/3CmefNq8oHSJ8NozPy6MMuDiPTTyjfYw3VQ+fZMvPIDPdcOnOL\n23C0saoS0yq+ddxGdD05eDOEcEgjJRtQuxw2wbFkEgnycU57hnucsxpwTEV/1n32\nsnqxLuylAgMBAAECggEASr/uMNXjs9UanjIbGvGOqO4JvBJ7Yw+uIvhcf6mqjgA0\n2XK9bTFRaZlw6MHnz0PHo3KS6/yST6vSZsYzDptK2zLQGRcXIkXVvg4HeVVUP6Ey\naldDtcVpq7VzSCaVHbOtorDP2ith9WD+6m5wQ2/yjb9TAOQmK4IgEIMeqV2XTUsQ\nkXrUKmlVsSZfjq4U1gyvHxhwVrqySbbSnv+VyGtTElZDVFBApE3eEj9+CwiYgsxT\nSkvgb14pF4U4y/5oWx69YZ/1BdYUJjW8Yc/F/XeKL4ZWnuMFsjdmUboouW4UFAP7\nm50+nbkYnxQ9Ml6yHLtY5eGSrjyV8ln0g7qvbCEacQKBgQDVI9wRy709EofzuhdK\nHW/U8OKU2ksWEp34jFO0F5+3j2ggaEtlMohMGvgX8CEvMfAizg6MxdzCqpzNTiDm\nxkJOTSoWO3XKi343Z71QszELagW4TgkrIlYic+BlM9UIEpBpSFKITJne9jvx1N+V\nelOAc6MhOMPqhWj17Zv6o9VlKwKBgQC5DdSOrlhryemd8FWX1rnl+wQOo8LvWueI\nJy9H9wL4BZqjOrmv8HilZBOBDbqWL/latkQdIcVscxKFKrkdvS4KAUiL1HKjZJtd\nWTDWgNyykd49rU/EU1Jelk/OrCTBOTD1aNtGb9/TAeCPB1kyz00moK9q3vlUg3ZV\nIzZ8pd6tbwKBgQDVAA8voaIuZFSFF5WqtZxK+6gUBcs/9b704pfLxEgTEzeGG3Qt\nX8Ch/dmtYoZnOcq3naEgwaOKzyIAcnGi7sLYqXjD2wwuLBUonX2uJkV/GKc6tpGn\nD5twtsirmo7skFDNRj9kgtjK3tytIoWGRkcoeWevDaGMv2JTUu+sHQpnHQKBgGDE\nSKgrpvUGanE6Yae6kw8dyatWGvNK19Osmd7J3fWQCKLebIcB+jSSNli/sxgiEgRL\nVybcp/3j1oVoJ9DTQiXdMfBcsW2biFqx7wXb8Iw4Frytyg5he6sWcrkh7z5TB7Ts\nle0pRyNx0dk5AH2/RRqz38bEviBhdhljBnT7z4tlAoGBAJ1GEV8G+oj0qHlgBiCf\n80BOvogPxYvjcTYu5J7o0Ad+HGVeZ7mrfs5+KwdwW1xzFzIXzA8KR76I6gAl3hhA\nkXmu4ZL3dJ62U9TFwvmF7nHDEkKS/vrkz0uwhx1v85BHLRUiTR7/bh/uGzvXAbAP\nTLGtOHqGeMUyjepkdtTk3EEc\n-----END PRIVATE KEY-----\n",
+  "client_email": "streamlit-gsheet-access@nestletruckmonitor-461804.iam.gserviceaccount.com",
+  "client_id": "116554901449350618015",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-gsheet-access%40nestletruckmonitor-461804.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
