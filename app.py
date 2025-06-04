@@ -22,17 +22,20 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# === Global view (no login) ===
+# === Load data
 df = load_data()
+
+# === Global view (no login) ===
 st.subheader("📋 Current Truck Status")
 
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    st.dataframe(df.style.applymap(
+    styled_df = df.style.applymap(
         lambda val: 'background-color: #81C784' if "🟢" in val else '',
         subset=["Status"]
-    ))
+    )
+    st.dataframe(styled_df, use_container_width=True)
 
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
@@ -50,32 +53,35 @@ role = get_user_role(password) if login_button else None
 # === Parking Staff Access ===
 if role == "Parking":
     st.sidebar.success("Logged in as: Parking Staff")
-    st.subheader("🟧 Update Truck Status (Parking Staff Only)")
-    
-    # Only Status Editable
-    editable_df = df.copy()
-    editable_df["Status"] = st.data_editor(df["Status"], use_container_width=True, key="parking_edit")
+    st.subheader("🟧 Update Truck Status Only (Parking Staff)")
+
+    editable_status_df = df.copy()
+    editable_status_df["Status"] = st.data_editor(
+        df["Status"],
+        use_container_width=True,
+        key="parking_editor"
+    )
 
     if st.button("Save Status Changes"):
-        df["Status"] = editable_df["Status"]
+        df["Status"] = editable_status_df["Status"]
         save_data(df)
         st.success("Status updated.")
         st.experimental_rerun()
 
-# === SCM Full Access ===
+# === SCM Staff Access ===
 elif role == "SCM":
     st.sidebar.success("Logged in as: SCM Staff")
 
-    # Add new entry
+    # Add new truck entry
     st.subheader("➕ Add New Truck Entry")
-    with st.form("add_truck_form"):
+    with st.form("add_form"):
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time")
         status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
-        submitted = st.form_submit_button("Add Entry")
+        submit = st.form_submit_button("Add Entry")
 
-        if submitted:
+        if submit:
             new_row = {
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
@@ -88,11 +94,11 @@ elif role == "SCM":
             st.success("New truck entry added.")
             st.experimental_rerun()
 
-    # Edit full table
-    st.subheader("🟩 Edit Full Truck Data (SCM Only)")
-    editable_df = st.data_editor(df, use_container_width=True, key="scm_edit")
+    # Full table edit
+    st.subheader("🟩 Edit Full Truck Table (SCM Only)")
+    edited_df = st.data_editor(df, use_container_width=True, key="scm_editor")
 
     if st.button("Save All Changes"):
-        save_data(editable_df)
-        st.success("All changes saved.")
+        save_data(edited_df)
+        st.success("Changes saved.")
         st.experimental_rerun()
