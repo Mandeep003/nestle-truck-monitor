@@ -3,10 +3,8 @@ import pandas as pd
 import datetime
 from config import get_user_role
 
-# File path for the CSV
 CSV_FILE = "trucks.csv"
 
-# Load or create the CSV
 def load_data():
     try:
         return pd.read_csv(CSV_FILE)
@@ -18,56 +16,25 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# UI starts here
+# Page Setup
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# === Global View (Always)
+# Load Data Initially
 df = load_data()
-st.subheader("📋 Current Truck Status")
 
-if df.empty:
-    st.info("No truck data available yet.")
-else:
-    styled_df = df.style.applymap(
-        lambda val: 'background-color: #81C784' if "🟢" in val else '',
-        subset=["Status"]
-    )
-    st.dataframe(styled_df, use_container_width=True)
-
-    with st.expander("🔍 Filter Options", expanded=False):
-        search_truck = st.text_input("Search by Truck Number")
-        if search_truck:
-            filtered_df = df[df["Truck Number"].str.contains(search_truck, case=False)]
-            st.dataframe(filtered_df if not filtered_df.empty else "No matching trucks.")
-
-# === Login Section
+# === Login Sidebar ===
 st.sidebar.title("🔐 Staff Login")
 password = st.sidebar.text_input("Enter your access password:", type="password")
 login_button = st.sidebar.button("Submit")
 
 role = get_user_role(password) if login_button else None
 
-# === Parking Staff
-if role == "Parking":
-    st.sidebar.success("Logged in as: Parking Staff")
-    st.subheader("🟧 Update Truck Status Only")
-
-    editable_status_df = df.copy()
-    editable_status_df["Status"] = st.data_editor(df["Status"], use_container_width=True, key="parking_editor")
-
-    if st.button("💾 Save Status Changes"):
-        df["Status"] = editable_status_df["Status"]
-        save_data(df)
-        st.success("Status updated successfully.")
-        st.experimental_rerun()
-
-# === SCM Staff
-elif role == "SCM":
+# === SCM Add Entry Form ===
+if role == "SCM":
     st.sidebar.success("Logged in as: SCM Staff")
-
-    # ➕ Add new truck entry
     st.subheader("➕ Add New Truck Entry")
+
     with st.form("add_form"):
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
@@ -93,13 +60,48 @@ elif role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
-            st.experimental_rerun()
+            st.experimental_rerun()  # <- this ensures fresh data reload
 
-    # 🛠️ Edit full table
+# === SCM Table Edit ===
+if role == "SCM":
     st.subheader("🛠️ Edit Full Truck Table (SCM Only)")
-    edited_df = st.data_editor(df, use_container_width=True, key="scm_editor")
+    df = load_data()  # reload after SCM actions
+    editable_df = st.data_editor(df, use_container_width=True, key="scm_editor")
 
     if st.button("💾 Save All Changes (SCM)"):
-        save_data(edited_df)
+        save_data(editable_df)
         st.success("All changes saved.")
         st.experimental_rerun()
+
+# === Parking Staff ===
+elif role == "Parking":
+    st.sidebar.success("Logged in as: Parking Staff")
+    st.subheader("🟧 Update Truck Status Only")
+
+    editable_status_df = df.copy()
+    editable_status_df["Status"] = st.data_editor(df["Status"], use_container_width=True, key="parking_editor")
+
+    if st.button("💾 Save Status Changes"):
+        df["Status"] = editable_status_df["Status"]
+        save_data(df)
+        st.success("Status updated.")
+        st.experimental_rerun()
+
+# === Global Viewer ===
+st.subheader("📋 Current Truck Status")
+
+df = load_data()  # reload again for viewers
+if df.empty:
+    st.info("No truck data available yet.")
+else:
+    styled_df = df.style.applymap(
+        lambda val: 'background-color: #81C784' if "🟢" in val else '',
+        subset=["Status"]
+    )
+    st.dataframe(styled_df, use_container_width=True)
+
+    with st.expander("🔍 Filter Options", expanded=False):
+        search_truck = st.text_input("Search by Truck Number")
+        if search_truck:
+            filtered_df = df[df["Truck Number"].str.contains(search_truck, case=False)]
+            st.dataframe(filtered_df if not filtered_df.empty else "No matching trucks.")
