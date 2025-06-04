@@ -85,6 +85,28 @@ if role == "SCM":
             st.success(f"Updated status for Truck {row['Truck Number']}")
             st.rerun()
 
+# ========== Parking UI ==========
+elif role == "Parking":
+    st.subheader("🚗 Update Trucks to 'Left (✅)' Only")
+
+    for idx, row in df.iterrows():
+        st.markdown(f"**Truck Number:** {row['Truck Number']} | Current Status: {row['Status']}")
+        
+        if row["Status"] != "Left (✅)":
+            selected_status = st.selectbox(
+                f"Set Status for {row['Truck Number']}",
+                ["Left (✅)"],
+                key=f"parking_select_{idx}"
+            )
+            if st.button(f"Mark as Left for {row['Truck Number']}", key=f"parking_button_{idx}"):
+                df.at[idx, "Status"] = selected_status
+                df.at[idx, "Updated By"] = "Parking"
+                save_data(df)
+                st.success(f"Truck {row['Truck Number']} marked as Left.")
+                st.rerun()
+        else:
+            st.info("Already marked as Left ✅")
+
 # ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
 
