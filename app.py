@@ -22,14 +22,8 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# ===== LOGIN with Submit Button =====
-with st.form("login_form"):
-    password = st.text_input("Enter your access password:", type="password")
-    login_btn = st.form_submit_button("Submit")
-
-if not login_btn:
-    st.stop()
-
+# Login for role
+password = st.text_input("Enter your access password:", type="password")
 role = get_user_role(password)
 
 if not role:
@@ -49,7 +43,7 @@ if role == "SCM":
         truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
-        status = st.selectbox("Status", ["Inside", "Ready to Leave (🟢)", "Left"])
+        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
 
         submitted = st.form_submit_button("Submit")
 
@@ -72,7 +66,7 @@ if role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
-            df = load_data()
+            df = load_data()  # reload after save
 
     # ========= Inline Status Editing Below =========
     st.subheader("✏️ Modify Truck Status")
@@ -80,8 +74,8 @@ if role == "SCM":
         st.markdown(f"**Truck Number:** {row['Truck Number']} | **Current Status:** {row['Status']}")
         new_status = st.selectbox(
             f"Change Status for {row['Truck Number']}",
-            ["Inside", "Ready to Leave (🟢)", "Left"],
-            index=["Inside", "Ready to Leave (🟢)", "Left"].index(row["Status"]),
+            ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
+            index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
             key=f"status_select_{idx}"
         )
         if st.button(f"Update Status for {row['Truck Number']}", key=f"update_button_{idx}"):
@@ -93,15 +87,15 @@ if role == "SCM":
 
 # ========== Parking UI ==========
 elif role == "Parking":
-    st.subheader("🚗 Update Trucks to 'Left' Only")
+    st.subheader("🚗 Update Trucks to 'Left (✅)' Only")
 
     for idx, row in df.iterrows():
         st.markdown(f"**Truck Number:** {row['Truck Number']} | Current Status: {row['Status']}")
         
-        if row["Status"] != "Left":
+        if row["Status"] != "Left (✅)":
             selected_status = st.selectbox(
                 f"Set Status for {row['Truck Number']}",
-                ["Left"],
+                ["Left (✅)"],
                 key=f"parking_select_{idx}"
             )
             if st.button(f"Mark as Left for {row['Truck Number']}", key=f"parking_button_{idx}"):
@@ -119,12 +113,12 @@ st.subheader("📋 Current Truck Status")
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    styled_df = df.style.applymap(
-        lambda val: 'background-color: #81C784' if "🟢" in val else '',
+    st.dataframe(df.style.applymap(
+        lambda val: 'background-color: #000000' if "🟡" in val else 
+                    'background-color: #81C784' if "🟢" in val else
+                    'background-color: #000000' if "✅" in val else '',
         subset=["Status"]
-    )
-
-    st.dataframe(styled_df)
+    ))
 
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
