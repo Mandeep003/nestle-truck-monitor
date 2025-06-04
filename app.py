@@ -22,21 +22,22 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# ===== Login with Submit Button =====
-with st.form("login_form"):
-    password = st.text_input("Enter your access password:", type="password")
-    login_btn = st.form_submit_button("Submit")
-
-if not login_btn:
-    st.stop()
-
-role = get_user_role(password)
-
-if not role:
-    st.warning("Please enter a valid password.")
-    st.stop()
-
-st.success(f"Logged in as: {role}")
+# ===== Login with Session State + Submit Button =====
+if "role" not in st.session_state:
+    with st.form("login_form"):
+        password = st.text_input("Enter your access password:", type="password")
+        login_btn = st.form_submit_button("Submit")
+    if not login_btn:
+        st.stop()
+    role = get_user_role(password)
+    if not role:
+        st.warning("Please enter a valid password.")
+        st.stop()
+    st.session_state.role = role
+    st.success(f"Logged in as: {role}")
+else:
+    role = st.session_state.role
+    st.success(f"Logged in as: {role}")
 
 # Load CSV data
 df = load_data()
@@ -72,7 +73,7 @@ if role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
-            df = load_data()  # reload after save
+            df = load_data()
 
     # ========= Inline Status Editing Below =========
     st.subheader("✏️ Modify Truck Status")
