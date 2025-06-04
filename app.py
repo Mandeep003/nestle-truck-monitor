@@ -11,7 +11,10 @@ def load_data():
     try:
         return pd.read_csv(CSV_FILE)
     except FileNotFoundError:
-        df = pd.DataFrame(columns=["Truck Number", "Driver Phone", "Entry Time", "Status", "Updated By"])
+        df = pd.DataFrame(columns=[
+            "Date", "Truck Number", "Driver Phone", "Entry Time",
+            "Vendor / Material", "Status", "Updated By"
+        ])
         df.to_csv(CSV_FILE, index=False)
         return df
 
@@ -50,15 +53,18 @@ if role == "SCM":
         truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
+        vendor_material = st.text_input("Vendor / Material in Truck")
         status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
 
         submitted = st.form_submit_button("Submit")
 
         if submitted:
             new_entry = {
+                "Date": datetime.date.today().strftime("%Y-%m-%d"),
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
                 "Entry Time": entry_time.strftime("%H:%M"),
+                "Vendor / Material": vendor_material,
                 "Status": status,
                 "Updated By": "SCM"
             }
