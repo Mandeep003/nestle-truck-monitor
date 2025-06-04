@@ -18,70 +18,59 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# UI starts here
+# UI setup
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Login for role
-password = st.text_input("Enter your access password:", type="password")
-role = get_user_role(password)
-
-if not role:
-    st.warning("Please enter a valid password.")
-    st.stop()
-
-st.success(f"Logged in as: {role}")
-
-# Load CSV data
+# === Global View (Everyone Sees This First) ===
 df = load_data()
-
-# ========== SCM UI ==========
-if role == "SCM":
-    st.subheader("📥 Add / Update Truck Status")
-
-    with st.form("truck_form"):
-        truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
-        driver_phone = st.text_input("Driver Phone")
-        entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
-        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
-
-        submitted = st.form_submit_button("Submit")
-
-        if submitted:
-            new_entry = {
-                "Truck Number": truck_number,
-                "Driver Phone": driver_phone,
-                "Entry Time": entry_time.strftime("%H:%M"),
-                "Status": status,
-                "Updated By": "SCM"
-            }
-
-            existing_index = df[df["Truck Number"] == truck_number].index
-
-            if not existing_index.empty:
-                df.loc[existing_index[0]] = new_entry
-                st.info("Truck entry updated.")
-            else:
-                df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-                st.success("New truck entry added.")
-
-            save_data(df)
-
-# ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
 
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    st.dataframe(df.style.applymap(
-        lambda val: 'background-color: #FFF176' if "🟡" in val else 
-                    'background-color: #81C784' if "🟢" in val else
-                    'background-color: #B2DFDB' if "✅" in val else '',
+    styled_df = df.style.applymap(
+        lambda val: 'background-color: #81C784' if "🟢" in val else '',
         subset=["Status"]
-    ))
+    )
+    st.dataframe(styled_df, use_container_width=True)
 
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
         if search_truck:
             filtered_df = df[df["Truck Number"].str.contains(search_truck, case=False)]
             st.dataframe(filtered_df if not filtered_df.empty else "No matching trucks.")
+
+# === Login Section ===
+st.sidebar.title("🔐 Staff Login")
+password = st.sidebar.text_input("Enter your access password:", type="password")
+login_button = st.sidebar.button("Submit")
+
+role = get_user_role(password) if login_button else None
+
+# === SCM UI ===
+if role == "SCM":
+    st.sidebar.success("Logged in as: SCM Staff")
+
+    st.subheader("🛠️ Edit Full Truck Table (SCM Only)")
+    editable_df = st.data_editor(df, use_container_width=True, key="scm_edit")
+
+    if st.button("💾 Save All Changes (SCM)"):
+        save_data(editable_df)
+        st.success("Changes saved successfully.")
+        st.experimental_rerun()
+
+# === Parking Staff UI ===
+elif role == "Parking":
+    st.sidebar.success("Logged in as: Parking Staff")
+
+    st.subheader("🛠️ Update Truck Status Only (Parking Staff)")
+
+    editable_status_df = df.copy()
+    editable_status_df["Status"] = st.data_editor(df["Status"], use_container_width=True, key="parking_edit")
+
+    if st.button("💾 Save Status Changes (Parking)"):
+        df["Status"] = editable_status_df["Status"]
+        save_data(df)
+        st.success("Status updated successfully.")
+        st.experimental_rerun()
