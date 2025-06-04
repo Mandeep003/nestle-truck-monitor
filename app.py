@@ -121,9 +121,9 @@ if df.empty:
     st.info("No truck data available yet.")
 else:
     st.dataframe(df.style.applymap(
-        lambda val: 'background-color: #FFFFFF' if "🟡" in val else 
+        lambda val: 'background-color: #797979' if "🟡" in val else 
                     'background-color: #81C784' if "🟢" in val else
-                    'background-color: #FFFFFF' if "✅" in val else '',
+                    'background-color: #797979' if "✅" in val else '',
         subset=["Status"]
     ))
 
