@@ -22,12 +22,18 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Login for role
-password = st.text_input("Enter your access password:", type="password")
+# Login with submit button
+with st.form("login_form"):
+    password = st.text_input("Enter your access password:", type="password")
+    login_submit = st.form_submit_button("Login")
+
+if not login_submit:
+    st.stop()
+
 role = get_user_role(password)
 
 if not role:
-    st.warning("Please enter a valid password.")
+    st.warning("Invalid password. Please try again.")
     st.stop()
 
 st.success(f"Logged in as: {role}")
@@ -113,12 +119,13 @@ st.subheader("📋 Current Truck Status")
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    st.dataframe(df.style.applymap(
-        lambda val: 'background-color: #FFF176' if "🟡" in val else 
-                    'background-color: #81C784' if "🟢" in val else
-                    'background-color: #B2DFDB' if "✅" in val else '',
+    # Only green color for "Ready to Leave"
+    styled_df = df.style.applymap(
+        lambda val: 'background-color: #81C784' if "🟢" in val else '',
         subset=["Status"]
-    ))
+    )
+
+    st.dataframe(styled_df)
 
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
