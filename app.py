@@ -22,12 +22,18 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Login for role
-password = st.text_input("Enter your access password:", type="password")
-role = get_user_role(password)
+# Login Section with Submit
+with st.form("login_form"):
+    password = st.text_input("Enter your access password:", type="password")
+    login_submit = st.form_submit_button("Login")
 
+if not login_submit:
+    st.stop()
+
+# Role logic
+role = get_user_role(password)
 if not role:
-    st.warning("Please enter a valid password.")
+    st.warning("Invalid password. Please try again.")
     st.stop()
 
 st.success(f"Logged in as: {role}")
@@ -66,6 +72,23 @@ if role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
+
+    # === Editable Status Table ===
+    st.subheader("✏️ Edit Truck Status")
+    for i, row in df.iterrows():
+        st.write(f"**Truck {row['Truck Number']}**")
+        new_status = st.selectbox(
+            f"Update status for Truck {row['Truck Number']}", 
+            ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
+            index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
+            key=f"status_select_{i}"
+        )
+        if st.button(f"Update Status for {row['Truck Number']}", key=f"update_button_{i}"):
+            df.at[i, "Status"] = new_status
+            df.at[i, "Updated By"] = "SCM"
+            save_data(df)
+            st.success(f"Status updated for Truck {row['Truck Number']}")
+            st.experimental_rerun()
 
 # ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
