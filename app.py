@@ -22,31 +22,17 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# --- Session-based login ---
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.role = None
+# Login for role
+password = st.text_input("Enter your access password:", type="password")
+role = get_user_role(password)
 
-if not st.session_state.logged_in:
-    with st.form("login_form"):
-        password = st.text_input("Enter your access password:", type="password")
-        login_submit = st.form_submit_button("Login")
-        if login_submit:
-            role = get_user_role(password)
-            if role:
-                st.session_state.logged_in = True
-                st.session_state.role = role
-                st.success(f"Logged in as: {role}")
-            else:
-                st.warning("Invalid password.")
-                st.stop()
+if not role:
+    st.warning("Please enter a valid password.")
     st.stop()
 
-# Get role from session
-role = st.session_state.role
 st.success(f"Logged in as: {role}")
 
-# Load data
+# Load CSV data
 df = load_data()
 
 # ========== SCM UI ==========
@@ -80,29 +66,24 @@ if role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
-            df = load_data()  # reload
+            df = load_data()  # reload after save
 
-    # ========== Editable Table ==========
-    st.subheader("✏️ Edit Truck Status (Directly in Table)")
-
-    editable_df = df.copy()
-    edited_df = st.data_editor(
-        editable_df,
-        use_container_width=True,
-        disabled=["Truck Number", "Driver Phone", "Entry Time", "Updated By"],
-        column_config={
-            "Status": st.column_config.SelectboxColumn(
-                "Status",
-                help="Change truck status",
-                options=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
-            )
-        }
-    )
-
-    if st.button("💾 Save Changes"):
-        save_data(edited_df)
-        st.success("Truck statuses updated successfully.")
-        df = load_data()  # Refresh
+    # ========= Inline Status Editing Below =========
+    st.subheader("✏️ Modify Truck Status")
+    for idx, row in df.iterrows():
+        st.markdown(f"**Truck Number:** {row['Truck Number']} | **Current Status:** {row['Status']}")
+        new_status = st.selectbox(
+            f"Change Status for {row['Truck Number']}",
+            ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
+            index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
+            key=f"status_select_{idx}"
+        )
+        if st.button(f"Update Status for {row['Truck Number']}", key=f"update_button_{idx}"):
+            df.at[idx, "Status"] = new_status
+            df.at[idx, "Updated By"] = "SCM"
+            save_data(df)
+            st.success(f"Updated status for Truck {row['Truck Number']}")
+            st.experimental_rerun()
 
 # ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
@@ -110,13 +91,12 @@ st.subheader("📋 Current Truck Status")
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    styled_df = df.style.applymap(
+    st.dataframe(df.style.applymap(
         lambda val: 'background-color: #FFF176' if "🟡" in val else 
                     'background-color: #81C784' if "🟢" in val else
                     'background-color: #B2DFDB' if "✅" in val else '',
         subset=["Status"]
-    )
-    st.dataframe(styled_df)
+    ))
 
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
