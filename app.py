@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
+import datetime
 from config import get_user_role
 
+# === File path ===
 CSV_FILE = "trucks.csv"
 
+# === Data loading/saving ===
 def load_data():
     try:
         return pd.read_csv(CSV_FILE)
@@ -15,45 +18,55 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
+# === Page setup ===
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Load Data
+# === Global view (no login) ===
 df = load_data()
-
-# ========== GLOBAL TABLE (Always Visible) ==========
 st.subheader("📋 Current Truck Status")
 
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    styled_df = df.style.applymap(
+    st.dataframe(df.style.applymap(
         lambda val: 'background-color: #81C784' if "🟢" in val else '',
         subset=["Status"]
-    )
-    st.dataframe(styled_df, use_container_width=True)
+    ))
 
-# Optional Filter
-with st.expander("🔍 Filter Trucks"):
-    search = st.text_input("Search by Truck Number or Driver Phone")
-    if search:
-        result = df[df.apply(lambda row: search.lower() in str(row).lower(), axis=1)]
-        st.dataframe(result if not result.empty else "No matching entries.")
+    with st.expander("🔍 Filter Options", expanded=False):
+        search_truck = st.text_input("Search by Truck Number")
+        if search_truck:
+            filtered_df = df[df["Truck Number"].str.contains(search_truck, case=False)]
+            st.dataframe(filtered_df if not filtered_df.empty else "No matching trucks.")
 
-# ========== SIDEBAR LOGIN ==========
+# === Side login ===
 st.sidebar.title("🔐 Staff Login")
-password = st.sidebar.text_input("Enter password", type="password")
-login_btn = st.sidebar.button("Submit")
+password = st.sidebar.text_input("Enter Password", type="password")
+login_button = st.sidebar.button("Submit")
 
-role = None
-if login_btn:
-    role = get_user_role(password)
+role = get_user_role(password) if login_button else None
 
-# ========== SCM STAFF ==========
-if role == "SCM":
-    st.success("✅ Logged in as SCM Staff")
+# === Parking Staff Access ===
+if role == "Parking":
+    st.sidebar.success("Logged in as: Parking Staff")
+    st.subheader("🟧 Update Truck Status (Parking Staff Only)")
+    
+    # Only Status Editable
+    editable_df = df.copy()
+    editable_df["Status"] = st.data_editor(df["Status"], use_container_width=True, key="parking_edit")
 
-    # Add New Entry Form
+    if st.button("Save Status Changes"):
+        df["Status"] = editable_df["Status"]
+        save_data(df)
+        st.success("Status updated.")
+        st.experimental_rerun()
+
+# === SCM Full Access ===
+elif role == "SCM":
+    st.sidebar.success("Logged in as: SCM Staff")
+
+    # Add new entry
     st.subheader("➕ Add New Truck Entry")
     with st.form("add_truck_form"):
         truck_number = st.text_input("Truck Number")
@@ -72,25 +85,14 @@ if role == "SCM":
             }
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_data(df)
-            st.success("New truck entry added successfully.")
+            st.success("New truck entry added.")
+            st.experimental_rerun()
 
-    # Edit Existing Table
-    st.subheader("🛠️ Edit Full Truck Table")
-    edited_df = st.data_editor(df, use_container_width=True, key="scm_editor")
+    # Edit full table
+    st.subheader("🟩 Edit Full Truck Data (SCM Only)")
+    editable_df = st.data_editor(df, use_container_width=True, key="scm_edit")
 
-    if st.button("💾 Save All Changes"):
-        save_data(edited_df)
-        st.success("Changes saved successfully.")
-
-# ========== PARKING STAFF ==========
-elif role == "Parking":
-    st.success("✅ Logged in as Parking Staff")
-
-    st.subheader("🛠️ Edit Truck Status Only")
-    status_only_df = df[["Status"]].copy()
-    updated_status = st.data_editor(status_only_df, use_container_width=True, key="parking_editor")
-
-    if st.button("💾 Save Status Changes (Parking)"):
-        df["Status"] = updated_status["Status"]
-        save_data(df)
-        st.success("Status updated successfully.")
+    if st.button("Save All Changes"):
+        save_data(editable_df)
+        st.success("All changes saved.")
+        st.experimental_rerun()
