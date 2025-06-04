@@ -42,10 +42,11 @@ if not st.session_state.logged_in:
                 st.stop()
     st.stop()
 
+# Get role from session
 role = st.session_state.role
 st.success(f"Logged in as: {role}")
 
-# Load CSV data
+# Load data
 df = load_data()
 
 # ========== SCM UI ==========
@@ -79,7 +80,29 @@ if role == "SCM":
                 st.success("New truck entry added.")
 
             save_data(df)
-            df = load_data()  # reload after saving
+            df = load_data()  # reload
+
+    # ========== Editable Table ==========
+    st.subheader("✏️ Edit Truck Status (Directly in Table)")
+
+    editable_df = df.copy()
+    edited_df = st.data_editor(
+        editable_df,
+        use_container_width=True,
+        disabled=["Truck Number", "Driver Phone", "Entry Time", "Updated By"],
+        column_config={
+            "Status": st.column_config.SelectboxColumn(
+                "Status",
+                help="Change truck status",
+                options=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
+            )
+        }
+    )
+
+    if st.button("💾 Save Changes"):
+        save_data(edited_df)
+        st.success("Truck statuses updated successfully.")
+        df = load_data()  # Refresh
 
 # ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
@@ -87,25 +110,6 @@ st.subheader("📋 Current Truck Status")
 if df.empty:
     st.info("No truck data available yet.")
 else:
-    if role == "SCM":
-        st.write("✏️ Click to update status inline:")
-        for idx, row in df.iterrows():
-            cols = st.columns([2, 2, 2, 3, 2])
-            cols[0].write(row["Truck Number"])
-            cols[1].write(row["Driver Phone"])
-            cols[2].write(row["Entry Time"])
-            new_status = cols[3].selectbox(
-                "", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
-                index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
-                key=f"status_{idx}"
-            )
-            if cols[4].button("Update", key=f"update_{idx}"):
-                df.at[idx, "Status"] = new_status
-                df.at[idx, "Updated By"] = "SCM"
-                save_data(df)
-                st.success(f"Updated status for {row['Truck Number']}")
-
-    # Styled full table display (read-only for non-SCM)
     styled_df = df.style.applymap(
         lambda val: 'background-color: #FFF176' if "🟡" in val else 
                     'background-color: #81C784' if "🟢" in val else
