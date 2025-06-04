@@ -83,7 +83,7 @@ if role == "SCM":
             df.at[idx, "Updated By"] = "SCM"
             save_data(df)
             st.success(f"Updated status for Truck {row['Truck Number']}")
-            st.experimental_rerun()
+            st.rerun()
 
 # ========== Viewer UI ==========
 st.subheader("📋 Current Truck Status")
