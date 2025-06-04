@@ -22,8 +22,14 @@ def save_data(df):
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# Login for role
-password = st.text_input("Enter your access password:", type="password")
+# ===== Login with Submit Button =====
+with st.form("login_form"):
+    password = st.text_input("Enter your access password:", type="password")
+    login_btn = st.form_submit_button("Submit")
+
+if not login_btn:
+    st.stop()
+
 role = get_user_role(password)
 
 if not role:
