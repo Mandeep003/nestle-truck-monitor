@@ -7,3 +7,4 @@ def get_user_role(password):
         return "Gate"
     else:
         return None
+print(get_user_role("gate123"))
