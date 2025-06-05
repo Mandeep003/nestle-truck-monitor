@@ -20,11 +20,11 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# UI starts
+# Set page
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# ========== LOGIN ==========
+# ===== Login with Session State + Submit Button =====
 if "role" not in st.session_state:
     with st.form("login_form"):
         password = st.text_input("Enter your access password:", type="password")
@@ -44,12 +44,12 @@ else:
 # Load data
 df = load_data()
 
-# ========== MASTER USER ==========
+# ========== MasterUser ==========
 if role == "MasterUser":
-    st.subheader("📥 Add / Update Truck Status")
+    st.subheader("🛠 MasterUser: Add / Edit Any Entry")
 
     with st.form("master_form"):
-        truck_number = st.text_input("Truck Number (e.g. DL01AB1234)")
+        truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
         vendor_material = st.text_input("Vendor / Material in Truck")
@@ -64,7 +64,7 @@ if role == "MasterUser":
                 "Entry Time": entry_time.strftime("%H:%M"),
                 "Vendor / Material": vendor_material,
                 "Status": status,
-                "Updated By": role
+                "Updated By": "MasterUser"
             }
             existing_index = df[df["Truck Number"] == truck_number].index
             if not existing_index.empty:
@@ -76,25 +76,33 @@ if role == "MasterUser":
             save_data(df)
             df = load_data()
 
-    st.subheader("✏️ Modify Any Truck Status")
+    # Inline Editor
     for idx, row in df.iterrows():
-        st.markdown(f"**Truck Number:** {row['Truck Number']} | Current Status: {row['Status']}")
-        new_status = st.selectbox(
-            f"Change Status for {row['Truck Number']}",
-            ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
-            index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
-            key=f"master_select_{idx}"
-        )
-        if st.button(f"Update Status for {row['Truck Number']}", key=f"master_update_{idx}"):
-            df.at[idx, "Status"] = new_status
-            df.at[idx, "Updated By"] = role
-            save_data(df)
-            st.success("Status updated.")
-            st.rerun()
+        with st.expander(f"✏️ Edit: {row['Truck Number']}"):
+            truck_number = st.text_input("Truck Number", row["Truck Number"], key=f"tn{idx}")
+            driver_phone = st.text_input("Driver Phone", row["Driver Phone"], key=f"ph{idx}")
+            entry_time = st.time_input("Entry Time",
+                                       value=datetime.datetime.strptime(row["Entry Time"], "%H:%M").time(),
+                                       key=f"time{idx}")
+            vendor_material = st.text_input("Vendor / Material", row["Vendor / Material"], key=f"vm{idx}")
+            status = st.selectbox("Status",
+                                  ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
+                                  index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
+                                  key=f"status{idx}")
+            if st.button(f"Save for {row['Truck Number']}", key=f"save{idx}"):
+                df.at[idx, "Truck Number"] = truck_number
+                df.at[idx, "Driver Phone"] = driver_phone
+                df.at[idx, "Entry Time"] = entry_time.strftime("%H:%M")
+                df.at[idx, "Vendor / Material"] = vendor_material
+                df.at[idx, "Status"] = status
+                df.at[idx, "Updated By"] = "MasterUser"
+                save_data(df)
+                st.success("Entry updated.")
+                st.rerun()
 
-# ========== GATE USER ==========
+# ========== Gate Staff ==========
 elif role == "Gate":
-    st.subheader("🚧 Gate Entry Form")
+    st.subheader("🚧 Gate Entry (Inside only)")
     with st.form("gate_form"):
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
@@ -118,13 +126,12 @@ elif role == "Gate":
             st.success("Gate entry added.")
             st.rerun()
 
-# ========== SCM USER ==========
+# ========== SCM ==========
 elif role == "SCM":
     st.subheader("✏️ SCM: Update Gate Entries Only")
-
     for idx, row in df.iterrows():
         if row["Updated By"] == "Gate":
-            st.markdown(f"**Truck Number:** {row['Truck Number']} | Status: {row['Status']} | Updated By: Gate")
+            st.markdown(f"**Truck:** {row['Truck Number']} | Status: {row['Status']} (Gate)")
             status_options = ["Inside (🟡)", "Ready to Leave (🟢)"]
             new_status = st.selectbox(
                 f"Change Status for {row['Truck Number']}",
@@ -132,37 +139,36 @@ elif role == "SCM":
                 index=status_options.index(row["Status"]) if row["Status"] in status_options else 0,
                 key=f"scm_select_{idx}"
             )
-            if st.button(f"Update Status for {row['Truck Number']}", key=f"scm_button_{idx}"):
+            if st.button(f"Update Status", key=f"scm_button_{idx}"):
                 df.at[idx, "Status"] = new_status
                 df.at[idx, "Updated By"] = "SCM"
                 save_data(df)
-                st.success(f"SCM updated status for Truck {row['Truck Number']}")
+                st.success(f"SCM updated {row['Truck Number']}")
                 st.rerun()
 
-# ========== PARKING USER ==========
+# ========== Parking ==========
 elif role == "Parking":
-    st.subheader("🚗 Parking: Update to Ready or Left")
-
+    st.subheader("🅿️ Parking: Update to Ready or Left")
     for idx, row in df.iterrows():
         if row["Status"] != "Left (✅)":
-            st.markdown(f"**Truck Number:** {row['Truck Number']} | Status: {row['Status']}")
-            status_options = ["Ready to Leave (🟢)", "Left (✅)"]
+            st.markdown(f"**Truck:** {row['Truck Number']} | Current Status: {row['Status']}")
+            options = ["Ready to Leave (🟢)", "Left (✅)"]
             new_status = st.selectbox(
-                f"Set New Status for {row['Truck Number']}",
-                status_options,
-                index=status_options.index(row["Status"]) if row["Status"] in status_options else 0,
-                key=f"parking_select_{idx}"
+                f"New Status",
+                options,
+                index=options.index(row["Status"]) if row["Status"] in options else 0,
+                key=f"parking_status_{idx}"
             )
-            if st.button(f"Confirm Status for {row['Truck Number']}", key=f"parking_button_{idx}"):
+            if st.button(f"Confirm Update", key=f"parking_button_{idx}"):
                 df.at[idx, "Status"] = new_status
                 df.at[idx, "Updated By"] = "Parking"
                 save_data(df)
-                st.success(f"Parking marked {row['Truck Number']} as {new_status}")
+                st.success("Status updated by Parking")
                 st.rerun()
         else:
-            st.info(f"{row['Truck Number']} already marked Left ✅")
+            st.info(f"{row['Truck Number']} is already marked as Left.")
 
-# ========== VIEWER UI ==========
+# ========== Viewer ==========
 st.subheader("📋 Current Truck Status")
 if df.empty:
     st.info("No truck data available.")
@@ -173,7 +179,6 @@ else:
                     'background-color: #797979' if "✅" in val else '',
         subset=["Status"]
     ))
-
     with st.expander("🔍 Filter Options", expanded=False):
         search_truck = st.text_input("Search by Truck Number")
         if search_truck:
