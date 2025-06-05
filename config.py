@@ -1,10 +1,11 @@
 def get_user_role(password):
-    if password == "scm123":
+    if password == "master123":
+        return "MasterUser"
+    elif password == "scm123":
         return "SCM"
-    elif password == "123":
-        return "Parking"
     elif password == "gate123":
         return "Gate"
+    elif password == "parking123":
+        return "Parking"
     else:
         return None
-print(get_user_role("gate123"))
