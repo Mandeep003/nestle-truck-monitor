@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import pytz
 from config import get_user_role
 
-# File path
 CSV_FILE = "trucks.csv"
 
 def load_data():
@@ -21,13 +19,7 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-def format_entry_time(entry_time):
-    local_tz = pytz.timezone("Asia/Kolkata")
-    entry_dt = datetime.datetime.combine(datetime.date.today(), entry_time)
-    entry_local = local_tz.localize(entry_dt)
-    return entry_local.strftime("%H:%M")
-
-# UI
+# UI setup
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
@@ -55,6 +47,7 @@ if role == "MasterUser":
     st.subheader("🛠 MasterUser: Add / Edit Any Entry")
 
     with st.form("master_form"):
+        date_input = st.date_input("Entry Date", value=datetime.date.today())
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
@@ -64,10 +57,10 @@ if role == "MasterUser":
 
         if submitted:
             new_entry = {
-                "Date": datetime.date.today().strftime("%Y-%m-%d"),
+                "Date": date_input.strftime("%Y-%m-%d"),
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
-                "Entry Time": format_entry_time(entry_time),
+                "Entry Time": entry_time.strftime("%H:%M"),
                 "Vendor / Material": vendor_material,
                 "Status": status,
                 "Updated By": "MasterUser"
@@ -84,6 +77,7 @@ if role == "MasterUser":
 
     for idx, row in df.iterrows():
         with st.expander(f"✏️ Edit: {row['Truck Number']}"):
+            date_input = st.date_input("Date", datetime.datetime.strptime(row["Date"], "%Y-%m-%d"), key=f"date{idx}")
             truck_number = st.text_input("Truck Number", row["Truck Number"], key=f"tn{idx}")
             driver_phone = st.text_input("Driver Phone", row["Driver Phone"], key=f"ph{idx}")
             entry_time = st.time_input("Entry Time", value=datetime.datetime.strptime(row["Entry Time"], "%H:%M").time(), key=f"time{idx}")
@@ -93,9 +87,10 @@ if role == "MasterUser":
                                   index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
                                   key=f"status{idx}")
             if st.button(f"Save for {row['Truck Number']}", key=f"save{idx}"):
+                df.at[idx, "Date"] = date_input.strftime("%Y-%m-%d")
                 df.at[idx, "Truck Number"] = truck_number
                 df.at[idx, "Driver Phone"] = driver_phone
-                df.at[idx, "Entry Time"] = format_entry_time(entry_time)
+                df.at[idx, "Entry Time"] = entry_time.strftime("%H:%M")
                 df.at[idx, "Vendor / Material"] = vendor_material
                 df.at[idx, "Status"] = status
                 df.at[idx, "Updated By"] = "MasterUser"
@@ -107,6 +102,7 @@ if role == "MasterUser":
 elif role == "Gate":
     st.subheader("🚧 Gate Entry (Inside only)")
     with st.form("gate_form"):
+        date_input = st.date_input("Entry Date", value=datetime.date.today())
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
@@ -114,10 +110,10 @@ elif role == "Gate":
         submitted = st.form_submit_button("Submit")
         if submitted:
             new_entry = {
-                "Date": datetime.date.today().strftime("%Y-%m-%d"),
+                "Date": date_input.strftime("%Y-%m-%d"),
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
-                "Entry Time": format_entry_time(entry_time),
+                "Entry Time": entry_time.strftime("%H:%M"),
                 "Vendor / Material": vendor_material,
                 "Status": "Inside (🟡)",
                 "Updated By": "Gate"
