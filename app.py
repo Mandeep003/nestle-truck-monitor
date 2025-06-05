@@ -45,8 +45,8 @@ else:
 # Load CSV data
 df = load_data()
 
-# ========== SCM UI ==========
-if role == "SCM":
+# ========== SCM and Gate Staff Shared Logic ==========
+if role in ["SCM", "Gate"]:
     st.subheader("📥 Add / Update Truck Status")
 
     with st.form("truck_form"):
@@ -54,7 +54,14 @@ if role == "SCM":
         driver_phone = st.text_input("Driver Phone")
         entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
         vendor_material = st.text_input("Vendor / Material in Truck")
-        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+
+        # SCM has full access, Gate only partial
+        if role == "SCM":
+            status_options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
+        else:
+            status_options = ["Inside (🟡)", "Left (✅)"]
+
+        status = st.selectbox("Status", status_options)
 
         submitted = st.form_submit_button("Submit")
 
@@ -66,7 +73,7 @@ if role == "SCM":
                 "Entry Time": entry_time.strftime("%H:%M"),
                 "Vendor / Material": vendor_material,
                 "Status": status,
-                "Updated By": "SCM"
+                "Updated By": role
             }
 
             existing_index = df[df["Truck Number"] == truck_number].index
@@ -81,19 +88,25 @@ if role == "SCM":
             save_data(df)
             df = load_data()
 
-    # ========= Inline Status Editing Below =========
+    # ========= Inline Status Editing =========
     st.subheader("✏️ Modify Truck Status")
     for idx, row in df.iterrows():
         st.markdown(f"**Truck Number:** {row['Truck Number']} | **Current Status:** {row['Status']}")
+
+        if role == "SCM":
+            status_options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
+        else:  # Gate
+            status_options = ["Inside (🟡)", "Left (✅)"]
+
         new_status = st.selectbox(
             f"Change Status for {row['Truck Number']}",
-            ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
-            index=["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"].index(row["Status"]),
+            status_options,
+            index=status_options.index(row["Status"]) if row["Status"] in status_options else 0,
             key=f"status_select_{idx}"
         )
         if st.button(f"Update Status for {row['Truck Number']}", key=f"update_button_{idx}"):
             df.at[idx, "Status"] = new_status
-            df.at[idx, "Updated By"] = "SCM"
+            df.at[idx, "Updated By"] = role
             save_data(df)
             st.success(f"Updated status for Truck {row['Truck Number']}")
             st.rerun()
