@@ -19,11 +19,10 @@ def load_data():
 def save_data(df):
     df.to_csv(CSV_FILE, index=False)
 
-# UI setup
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚚 Nestlé Truck Monitoring System")
 
-# ===== Login =====
+# Login Section
 if "role" not in st.session_state:
     with st.form("login_form"):
         password = st.text_input("Enter your access password:", type="password")
@@ -50,7 +49,7 @@ if role == "MasterUser":
         date_input = st.date_input("Entry Date", value=datetime.date.today())
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
-        entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
+        entry_time = st.text_input("Entry Time (HH:MM)")
         vendor_material = st.text_input("Vendor / Material in Truck")
         status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
         submitted = st.form_submit_button("Submit")
@@ -60,7 +59,7 @@ if role == "MasterUser":
                 "Date": date_input.strftime("%Y-%m-%d"),
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
-                "Entry Time": entry_time.strftime("%H:%M"),
+                "Entry Time": entry_time,
                 "Vendor / Material": vendor_material,
                 "Status": status,
                 "Updated By": "MasterUser"
@@ -80,7 +79,7 @@ if role == "MasterUser":
             date_input = st.date_input("Date", datetime.datetime.strptime(row["Date"], "%Y-%m-%d"), key=f"date{idx}")
             truck_number = st.text_input("Truck Number", row["Truck Number"], key=f"tn{idx}")
             driver_phone = st.text_input("Driver Phone", row["Driver Phone"], key=f"ph{idx}")
-            entry_time = st.time_input("Entry Time", value=datetime.datetime.strptime(row["Entry Time"], "%H:%M").time(), key=f"time{idx}")
+            entry_time = st.text_input("Entry Time (HH:MM)", row["Entry Time"], key=f"time{idx}")
             vendor_material = st.text_input("Vendor / Material", row["Vendor / Material"], key=f"vm{idx}")
             status = st.selectbox("Status",
                                   ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"],
@@ -90,7 +89,7 @@ if role == "MasterUser":
                 df.at[idx, "Date"] = date_input.strftime("%Y-%m-%d")
                 df.at[idx, "Truck Number"] = truck_number
                 df.at[idx, "Driver Phone"] = driver_phone
-                df.at[idx, "Entry Time"] = entry_time.strftime("%H:%M")
+                df.at[idx, "Entry Time"] = entry_time
                 df.at[idx, "Vendor / Material"] = vendor_material
                 df.at[idx, "Status"] = status
                 df.at[idx, "Updated By"] = "MasterUser"
@@ -105,7 +104,7 @@ elif role == "Gate":
         date_input = st.date_input("Entry Date", value=datetime.date.today())
         truck_number = st.text_input("Truck Number")
         driver_phone = st.text_input("Driver Phone")
-        entry_time = st.time_input("Entry Time", value=datetime.datetime.now().time())
+        entry_time = st.text_input("Entry Time (HH:MM)")
         vendor_material = st.text_input("Vendor / Material in Truck")
         submitted = st.form_submit_button("Submit")
         if submitted:
@@ -113,7 +112,7 @@ elif role == "Gate":
                 "Date": date_input.strftime("%Y-%m-%d"),
                 "Truck Number": truck_number,
                 "Driver Phone": driver_phone,
-                "Entry Time": entry_time.strftime("%H:%M"),
+                "Entry Time": entry_time,
                 "Vendor / Material": vendor_material,
                 "Status": "Inside (🟡)",
                 "Updated By": "Gate"
