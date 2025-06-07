@@ -1,7 +1,8 @@
-import streamlit as st
+import streamlit as st 
 from pyairtable import Table
 import os
 from config import get_user_role
+import pandas as pd
 
 # Load Airtable API credentials
 AIRTABLE_API_KEY = os.getenv("AIRTABLE_API_KEY")
@@ -182,12 +183,14 @@ else:
     for record in records:
         fields = record["fields"]
         df.append({
-            "Truck Number": fields.get("Truck Number", ""),
-            "Driver Phone": fields.get("Driver Phone", ""),
-            "Entry Time": fields.get("Entry Time", ""),
-            "Date": fields.get("Date", ""),
-            "Vendor / Material": fields.get("Vendor / Material", ""),
-            "Status": fields.get("Status", ""),
-            "Updated By": fields.get("Updated By", "")
+            "Truck Number": fields.get("Truck Number", "").strip(),
+            "Driver Phone": fields.get("Driver Phone", "").strip(),
+            "Entry Time": fields.get("Entry Time", "").strip(),
+            "Date": fields.get("Date", "").strip(),
+            "Vendor / Material": fields.get("Vendor / Material", "").strip(),
+            "Status": fields.get("Status", "").strip(),
+            "Updated By": fields.get("Updated By", "").strip()
         })
+    df = pd.DataFrame(df)
+    df = df.fillna("").sort_values(by="Date", ascending=False).reset_index(drop=True)
     st.dataframe(df)
