@@ -83,7 +83,7 @@ if role == "Gate":
             }
             if add_entry(entry):
                 st.success("Truck entry added.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Failed to add entry. All fields are required.")
 
@@ -101,7 +101,7 @@ elif role == "SCM":
             if st.button(f"Update {truck}"):
                 if update_entry_status(record["id"], new_status):
                     st.success("Status updated.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Update failed.")
 
@@ -119,7 +119,7 @@ elif role == "Parking":
             if st.button(f"Update {truck}"):
                 if update_entry_status(record["id"], new_status):
                     st.success("Status updated.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Update failed.")
 
@@ -147,7 +147,7 @@ elif role == "MasterUser":
                 }
                 if add_entry(entry):
                     st.success("Entry added.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("All fields required.")
 
@@ -162,13 +162,13 @@ elif role == "MasterUser":
         if st.button(f"Update Status: {truck}", key="update_" + record["id"]):
             if update_entry_status(record["id"], new_status):
                 st.success("Status updated.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Failed.")
         if st.button(f"🗑 Delete {truck}", key="delete_" + record["id"]):
             if delete_entry(record["id"]):
                 st.success("Deleted successfully.")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Deletion failed.")
 
