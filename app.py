@@ -1,141 +1,193 @@
 import streamlit as st
 from pyairtable import Table
 import os
+from config import get_user_role
 
-# Load secrets from Streamlit Cloud environment
-AIRTABLE_API_KEY = st.secrets["AIRTABLE_API_KEY"]
-AIRTABLE_BASE_ID = st.secrets["AIRTABLE_BASE_ID"]
-AIRTABLE_TABLE_NAME = st.secrets["AIRTABLE_TABLE_NAME"]
+# Load Airtable API credentials
+AIRTABLE_API_KEY = os.getenv("AIRTABLE_API_KEY")
+AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
+AIRTABLE_TABLE_NAME = os.getenv("AIRTABLE_TABLE_NAME")
 
-table = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+# Airtable connection
+airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
 
-def get_user_role(password):
-    return {
-        "master2025": "MasterUser",
-        "scm2025": "SCM",
-        "gate123": "Gate",
-        "123": "Parking"
-    }.get(password)
-
+# Page config
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
 st.title("🚛 Nestlé Truck Monitoring System")
 
+# Session login
 if "role" not in st.session_state:
-    with st.form("login_form"):
+    with st.form("login"):
         password = st.text_input("Enter your access password:", type="password")
-        login_btn = st.form_submit_button("Submit")
-    if not login_btn:
-        st.stop()
-    role = get_user_role(password)
-    if not role:
-        st.warning("Please enter a valid password.")
-        st.stop()
-    st.session_state.role = role
-    st.success(f"Logged in as: {role}")
-else:
-    role = st.session_state.role
-    st.success(f"Logged in as: {role}")
-
-records = table.all()
-df_data = []
-for rec in records:
-    fields = rec.get("fields", {})
-    fields["RecordID"] = rec["id"]
-    df_data.append(fields)
-
-import pandas as pd
-df = pd.DataFrame(df_data)
-df = df[["Truck Number", "Driver Phone", "Entry Time", "Date", "Vendor / Material", "Status", "Updated By", "RecordID"]]
-df_display = df.drop(columns=["RecordID"])
-
-if role == "Gate":
-    st.subheader("🛂 Gate Entry (Inside only)")
-    with st.form("add_entry"):
-        date = st.text_input("Entry Date (YYYY-MM-DD)")
-        truck_number = st.text_input("Truck Number")
-        driver_phone = st.text_input("Driver Phone")
-        entry_time = st.text_input("Entry Time (HH:MM)")
-        vendor_material = st.text_input("Vendor / Material")
-        status = "Inside (🟡)"
         submitted = st.form_submit_button("Submit")
         if submitted:
-            try:
-                table.create({
-                    "Date": date,
-                    "Truck Number": truck_number,
-                    "Driver Phone": driver_phone,
-                    "Entry Time": entry_time,
-                    "Vendor / Material": vendor_material,
-                    "Status": status,
-                    "Updated By": "Gate"
-                })
-                st.success("New truck entry added.")
-                st.rerun()
-            except:
-                st.error("Failed to add entry.")
+            role = get_user_role(password)
+            if role:
+                st.session_state.role = role
+                st.success(f"Logged in as: {role}")
+            else:
+                st.warning("Invalid password.")
+                st.stop()
+        else:
+            st.stop()
 
+role = st.session_state.role
+st.success(f"Logged in as: {role}")
+
+# Load Airtable records
+def load_data():
+    return airtable.all()
+
+def add_entry(entry_data):
+    # Skip entry if any key info is missing
+    required_fields = ["Truck Number", "Driver Phone", "Entry Time", "Date", "Vendor / Material", "Status", "Updated By"]
+    if any(not entry_data.get(field) for field in required_fields):
+        return False
+    airtable.create(entry_data)
+    return True
+
+def update_entry_status(record_id, new_status):
+    try:
+        airtable.update(record_id, {"Status": new_status, "Updated By": role})
+        return True
+    except:
+        return False
+
+def delete_entry(record_id):
+    try:
+        airtable.delete(record_id)
+        return True
+    except:
+        return False
+
+# Gate Entry Form
+if role == "Gate":
+    st.subheader("🛃 Gate Entry (Inside only)")
+    with st.form("gate_form"):
+        date = st.text_input("Entry Date (YYYY-MM-DD)")
+        truck = st.text_input("Truck Number")
+        phone = st.text_input("Driver Phone")
+        entry_time = st.text_input("Entry Time (HH:MM)")
+        vendor = st.text_input("Vendor / Material in Truck")
+        status = "Inside (🟡)"
+        submit = st.form_submit_button("Submit")
+        if submit:
+            entry = {
+                "Date": date,
+                "Truck Number": truck,
+                "Driver Phone": phone,
+                "Entry Time": entry_time,
+                "Vendor / Material": vendor,
+                "Status": status,
+                "Updated By": role
+            }
+            if add_entry(entry):
+                st.success("Truck entry added.")
+                st.experimental_rerun()
+            else:
+                st.error("Failed to add entry. All fields are required.")
+
+# SCM Update Section
 elif role == "SCM":
-    st.subheader("🛠️ SCM - Status Update (for Gate Entries)")
-    scm_entries = df[df["Updated By"] == "Gate"]
-    for i, row in scm_entries.iterrows():
-        st.markdown(f"*Truck:* {row['Truck Number']} | *Status:* {row['Status']}")
-        status_option = st.selectbox(
-            f"Update Status for {row['Truck Number']}",
-            ["Inside (🟡)", "Ready to Leave (🟢)"],
-            key=f"scm_select_{i}"
-        )
-        if st.button(f"Update {row['Truck Number']}", key=f"scm_btn_{i}"):
-            try:
-                table.update(row["RecordID"], {
-                    "Status": status_option,
-                    "Updated By": "SCM"
-                })
-                st.success("Status updated.")
-                st.rerun()
-            except:
-                st.error("Update failed.")
+    st.subheader("🛠 SCM - Status Update (for Gate Entries)")
+    records = load_data()
+    for record in records:
+        fields = record["fields"]
+        if fields.get("Updated By") == "Gate":
+            truck = fields.get("Truck Number", "Unknown")
+            current_status = fields.get("Status", "")
+            st.markdown(f"Truck:** {truck} | *Status:* {current_status}")
+            new_status = st.selectbox(f"Update Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)"], key=truck)
+            if st.button(f"Update {truck}"):
+                if update_entry_status(record["id"], new_status):
+                    st.success("Status updated.")
+                    st.experimental_rerun()
+                else:
+                    st.error("Update failed.")
 
+# Parking Update Section
 elif role == "Parking":
-    st.subheader("🚗 Parking Staff - Mark Trucks as Left")
-    for i, row in df[df["Status"] != "Left (✅)"].iterrows():
-        if st.button(f"Mark {row['Truck Number']} as Left", key=f"park_{i}"):
-            try:
-                table.update(row["RecordID"], {
-                    "Status": "Left (✅)",
-                    "Updated By": "Parking"
-                })
-                st.success("Truck marked as Left.")
-                st.rerun()
-            except:
-                st.error("Failed to update status.")
+    st.subheader("🚗 Parking - Mark Trucks as Left")
+    records = load_data()
+    for record in records:
+        fields = record["fields"]
+        truck = fields.get("Truck Number", "")
+        status = fields.get("Status", "")
+        if status != "Left (✅)":
+            st.markdown(f"Truck:** {truck} | *Current:* {status}")
+            new_status = st.selectbox(f"Set Status for {truck}", ["Ready to Leave (🟢)", "Left (✅)"], key=truck)
+            if st.button(f"Update {truck}"):
+                if update_entry_status(record["id"], new_status):
+                    st.success("Status updated.")
+                    st.experimental_rerun()
+                else:
+                    st.error("Update failed.")
 
+# MasterUser Full Access
 elif role == "MasterUser":
-    st.subheader("👑 Master Control Panel")
-    for i, row in df.iterrows():
-        st.markdown(f"**Truck:** {row['Truck Number']} | **Status:** {row['Status']}")
-        with st.expander(f"Edit or Delete {row['Truck Number']}"):
-            new_status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"], index=0, key=f"edit_status_{i}")
-            new_date = st.text_input("Date", row["Date"], key=f"edit_date_{i}")
-            new_time = st.text_input("Time", row["Entry Time"], key=f"edit_time_{i}")
-            if st.button(f"Update {row['Truck Number']}", key=f"master_update_{i}"):
-                try:
-                    table.update(row["RecordID"], {
-                        "Status": new_status,
-                        "Date": new_date,
-                        "Entry Time": new_time,
-                        "Updated By": "MasterUser"
-                    })
-                    st.success("Updated.")
-                    st.rerun()
-                except:
-                    st.error("Failed to update.")
-            if st.button(f"❌ Delete {row['Truck Number']}", key=f"delete_{i}"):
-                try:
-                    table.delete(row["RecordID"])
-                    st.warning(f"Deleted {row['Truck Number']}.")
-                    st.rerun()
-                except:
-                    st.error("Delete failed.")
+    st.subheader("🧠 MasterUser: Full Control")
+    with st.expander("➕ Add New Entry"):
+        with st.form("master_add"):
+            date = st.text_input("Date")
+            truck = st.text_input("Truck Number")
+            phone = st.text_input("Driver Phone")
+            entry_time = st.text_input("Entry Time (HH:MM)")
+            vendor = st.text_input("Vendor / Material")
+            status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+            submit = st.form_submit_button("Add Entry")
+            if submit:
+                entry = {
+                    "Date": date,
+                    "Truck Number": truck,
+                    "Driver Phone": phone,
+                    "Entry Time": entry_time,
+                    "Vendor / Material": vendor,
+                    "Status": status,
+                    "Updated By": role
+                }
+                if add_entry(entry):
+                    st.success("Entry added.")
+                    st.experimental_rerun()
+                else:
+                    st.error("All fields required.")
 
-st.subheader("📋 Current Truck Status")
-st.dataframe(df_display)
+    st.subheader("📋 Current Truck Status")
+    records = load_data()
+    for record in records:
+        fields = record["fields"]
+        truck = fields.get("Truck Number", "Unknown")
+        current_status = fields.get("Status", "")
+        st.markdown(f"*Truck:* {truck} | *Status:* {current_status}")
+        new_status = st.selectbox(f"Change Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"], key=record["id"])
+        if st.button(f"Update Status: {truck}", key="update_" + record["id"]):
+            if update_entry_status(record["id"], new_status):
+                st.success("Status updated.")
+                st.experimental_rerun()
+            else:
+                st.error("Failed.")
+        if st.button(f"🗑 Delete {truck}", key="delete_" + record["id"]):
+            if delete_entry(record["id"]):
+                st.success("Deleted successfully.")
+                st.experimental_rerun()
+            else:
+                st.error("Deletion failed.")
+
+# View-Only for All
+st.subheader("📄 Current Truck Status")
+records = load_data()
+if not records:
+    st.info("No entries yet.")
+else:
+    df = []
+    for record in records:
+        fields = record["fields"]
+        df.append({
+            "Truck Number": fields.get("Truck Number", ""),
+            "Driver Phone": fields.get("Driver Phone", ""),
+            "Entry Time": fields.get("Entry Time", ""),
+            "Date": fields.get("Date", ""),
+            "Vendor / Material": fields.get("Vendor / Material", ""),
+            "Status": fields.get("Status", ""),
+            "Updated By": fields.get("Updated By", "")
+        })
+    st.dataframe(df)
