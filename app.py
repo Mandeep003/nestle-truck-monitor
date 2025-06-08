@@ -9,8 +9,10 @@ AIRTABLE_API_KEY = st.secrets.get("AIRTABLE_API_KEY") or os.getenv("AIRTABLE_API
 AIRTABLE_BASE_ID = st.secrets.get("AIRTABLE_BASE_ID") or os.getenv("AIRTABLE_BASE_ID")
 AIRTABLE_TABLE_NAME = st.secrets.get("AIRTABLE_TABLE_NAME") or os.getenv("AIRTABLE_TABLE_NAME")
 
-if not AIRTABLE_API_KEY or not AIRTABLE_BASE_ID or not AIRTABLE_TABLE_NAME:
-    st.error("❌ Airtable credentials missing. Please check secrets.")
+if AIRTABLE_API_KEY and AIRTABLE_BASE_ID and AIRTABLE_TABLE_NAME:
+    airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+else:
+    st.error("❌ Airtable credentials are missing. Check your secrets or environment variables.")
     st.stop()
 # Airtable connection
 airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
