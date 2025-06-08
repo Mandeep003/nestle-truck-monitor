@@ -1,4 +1,4 @@
-import streamlit as st 
+import streamlit as st
 from pyairtable import Table
 import os
 from config import get_user_role
@@ -172,7 +172,16 @@ elif role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
-# View for All
+    if st.button("🧹 Delete All 'Left (✅)' Trucks"):
+        deleted = 0
+        for record in records:
+            if record["fields"].get("Status") == "Left (✅)":
+                delete_entry(record["id"])
+                deleted += 1
+        st.success(f"Deleted {deleted} trucks marked as 'Left (✅)'")
+        st.rerun()
+
+# View for All Roles (Editable)
 st.subheader("📄 Current Truck Status")
 records = load_data()
 if not records:
@@ -192,4 +201,24 @@ else:
         })
     df = pd.DataFrame(df)
     df = df.fillna("").sort_values(by="Date", ascending=False).reset_index(drop=True)
-    st.dataframe(df)
+
+    editable_cols = []
+    if role == "SCM":
+        editable_cols = ["Status"]
+        df = df[df["Updated By"] == "Gate"]
+    elif role == "Parking":
+        editable_cols = ["Status"]
+        df = df[df["Status"] != "Left (✅)"]
+    elif role == "MasterUser":
+        editable_cols = ["Status"]
+
+    edited_df = st.data_editor(df, num_rows="dynamic", disabled=[c for c in df.columns if c not in editable_cols], key="editable_df")
+
+    for idx, row in edited_df.iterrows():
+        original = df.iloc[idx]
+        if row["Status"] != original["Status"]:
+            record_id = next((r["id"] for r in records if r["fields"].get("Truck Number") == row["Truck Number"]), None)
+            if record_id:
+                update_entry_status(record_id, row["Status"])
+                st.success(f"Updated status for {row['Truck Number']}")
+                st.rerun()
