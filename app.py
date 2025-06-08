@@ -172,6 +172,16 @@ elif role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
+    # ✅ Delete All Left Trucks Button
+    if st.button("🧹 Delete All 'Left (✅)' Trucks"):
+        deleted = 0
+        for record in records:
+            if record["fields"].get("Status") == "Left (✅)":
+                if delete_entry(record["id"]):
+                    deleted += 1
+        st.success(f"Deleted {deleted} trucks marked as 'Left (✅)'")
+        st.rerun()
+
 # View for All
 st.subheader("📄 Current Truck Status")
 records = load_data()
