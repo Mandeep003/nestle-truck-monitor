@@ -4,9 +4,10 @@ import pandas as pd
 from config import get_user_role
 
 # Load secrets from Streamlit
-AIRTABLE_API_KEY = st.secrets["AIRTABLE_API_KEY"]
-AIRTABLE_BASE_ID = st.secrets["AIRTABLE_BASE_ID"]
-AIRTABLE_TABLE_NAME = st.secrets["AIRTABLE_TABLE_NAME"]
+AIRTABLE_API_KEY = st.secrets.get("AIRTABLE_API_KEY") or os.getenv("AIRTABLE_API_KEY")
+AIRTABLE_BASE_ID = st.secrets.get("AIRTABLE_BASE_ID") or os.getenv("AIRTABLE_BASE_ID")
+AIRTABLE_TABLE_NAME = st.secrets.get("AIRTABLE_TABLE_NAME") or os.getenv("AIRTABLE_TABLE_NAME")
+
 
 # Airtable connection
 airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
