@@ -10,7 +10,7 @@ AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
 AIRTABLE_TABLE_NAME = os.getenv("AIRTABLE_TABLE_NAME")
 
 # Airtable connection
-airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+airtable = Table(api_key=AIRTABLE_API_KEY, base_id=AIRTABLE_BASE_ID, table_name=AIRTABLE_TABLE_NAME)
 
 # Page config
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
@@ -172,16 +172,25 @@ elif role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
+    if st.button("🧹 Delete All 'Left (✅)' Trucks"):
+        deleted = 0
+        for record in records:
+            if record["fields"].get("Status") == "Left (✅)":
+                delete_entry(record["id"])
+                deleted += 1
+        st.success(f"Deleted {deleted} trucks marked as 'Left (✅)'")
+        st.rerun()
+
 # View for All
 st.subheader("📄 Current Truck Status")
 records = load_data()
 if not records:
     st.info("No entries yet.")
 else:
-    df = []
+    df_data = []
     for record in records:
         fields = record["fields"]
-        df.append({
+        df_data.append({
             "Truck Number": fields.get("Truck Number", "").strip(),
             "Driver Phone": fields.get("Driver Phone", "").strip(),
             "Entry Time": fields.get("Entry Time", "").strip(),
@@ -190,6 +199,33 @@ else:
             "Status": fields.get("Status", "").strip(),
             "Updated By": fields.get("Updated By", "").strip()
         })
-    df = pd.DataFrame(df)
-    df = df.fillna("").sort_values(by="Date", ascending=False).reset_index(drop=True)
-    st.dataframe(df)
+
+    df = pd.DataFrame(df_data).fillna("").sort_values(by="Date", ascending=False).reset_index(drop=True)
+
+    # Role-based editable logic
+    editable_cols = []
+    filtered_df = df.copy()
+    if role == "SCM":
+        filtered_df = df[df["Updated By"] == "Gate"].copy()
+        editable_cols = ["Status"]
+    elif role == "Parking":
+        filtered_df = df[df["Status"] != "Left (✅)"].copy()
+        editable_cols = ["Status"]
+    elif role == "MasterUser":
+        editable_cols = ["Status"]
+
+    edited_df = st.data_editor(
+        filtered_df,
+        num_rows="dynamic",
+        disabled=[col for col in filtered_df.columns if col not in editable_cols],
+        key="editable_table_final"
+    )
+
+    for idx, row in edited_df.iterrows():
+        original = filtered_df.loc[row.name]
+        if row["Status"] != original["Status"]:
+            record_id = next((r["id"] for r in records if r["fields"].get("Truck Number") == row["Truck Number"]), None)
+            if record_id:
+                update_entry_status(record_id, row["Status"])
+                st.success(f"Status updated for {row['Truck Number']}")
+                st.rerun()
