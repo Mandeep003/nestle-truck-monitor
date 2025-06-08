@@ -145,7 +145,7 @@ else:
             "Updated By": fields.get("Updated By", "").strip()
         })
 
-    df = pd.DataFrame(df_data).fillna("").sort_values(by="Date", ascending=False).reset_index(drop=True)
+    df = pd.DataFrame(df_data).fillna("").sort_values(by="Date", ascending=False).reset_index(drop=False)
 
     editable_cols = []
     filtered_df = df.copy()
@@ -166,7 +166,7 @@ else:
     )
 
     for idx, row in edited_df.iterrows():
-        original = filtered_df.iloc[idx]
+        original = filtered_df.loc[row.name]
         if row["Status"] != original["Status"]:
             record_id = next((r["id"] for r in records if r["fields"].get("Truck Number") == row["Truck Number"]), None)
             if record_id:
