@@ -87,45 +87,69 @@ if role == "Gate":
             else:
                 st.error("Failed to add entry. All fields are required.")
 
-# Status Table for SCM, Parking, MasterUser
+# Search + Aligned Status Table for SCM, Parking, MasterUser
 elif role in ["SCM", "Parking", "MasterUser"]:
     st.subheader("📋 Truck Status Management Table")
     records = load_data()
-    for i, record in enumerate(records):
+
+    search_term = st.text_input("🔍 Search by Truck Number or Material").strip().lower()
+
+    filtered_records = []
+    for record in records:
         fields = record["fields"]
-        record_id = record["id"]
-        truck = fields.get("Truck Number", "")
-        current_status = fields.get("Status", "")
+        truck = fields.get("Truck Number", "").lower()
+        vendor = fields.get("Vendor / Material", "").lower()
         updated_by = fields.get("Updated By", "")
+        current_status = fields.get("Status", "")
 
         if role == "SCM" and updated_by != "Gate":
             continue
         if role == "Parking" and current_status == "Left (✅)":
             continue
 
-        col1, col2, col3 = st.columns([3, 4, 2])
-        with col1:
-            st.markdown(f"**{truck}**")
-        with col2:
+        if search_term in truck or search_term in vendor:
+            filtered_records.append(record)
+        elif not search_term:
+            filtered_records.append(record)
+
+    if filtered_records:
+        st.markdown("### 🗃️ Matching Records")
+        headers = st.columns([3, 3, 2])
+        headers[0].markdown("**Truck Number**")
+        headers[1].markdown("**Status**")
+        headers[2].markdown("**Action**")
+
+        for i, record in enumerate(filtered_records):
+            fields = record["fields"]
+            record_id = record["id"]
+            truck = fields.get("Truck Number", "")
+            current_status = fields.get("Status", "")
+
+            row = st.columns([3, 3, 2])
+            row[0].markdown(truck)
+
             if role == "SCM":
                 options = ["Inside (🟡)", "Ready to Leave (🟢)"]
             elif role == "Parking":
                 options = ["Ready to Leave (🟢)", "Left (✅)"]
             else:
                 options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
-            new_status = st.selectbox(
+
+            new_status = row[1].selectbox(
                 label="",
                 options=options,
                 index=options.index(current_status) if current_status in options else 0,
-                key=f"status_select_{i}"
+                key=f"status_{i}"
             )
-        with col3:
-            if st.button("Update", key=f"update_btn_{i}"):
+
+            if row[2].button("Update", key=f"update_{i}"):
                 if update_entry_status(record_id, new_status):
                     st.success(f"{truck} updated to {new_status}")
                     st.rerun()
                 else:
                     st.error("Update failed.")
+    else:
+        st.info("No matching records found.")
 
 # MasterUser Add + Delete
 if role == "MasterUser":
