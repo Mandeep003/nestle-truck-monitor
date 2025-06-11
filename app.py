@@ -10,7 +10,7 @@ AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
 AIRTABLE_TABLE_NAME = os.getenv("AIRTABLE_TABLE_NAME")
 
 # Airtable connection
-airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
+airtable = Table(api_key=AIRTABLE_API_KEY, base_id=AIRTABLE_BASE_ID, table_name=AIRTABLE_TABLE_NAME)
 
 # Page config
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
@@ -87,102 +87,94 @@ if role == "Gate":
             else:
                 st.error("Failed to add entry. All fields are required.")
 
-# Search + Aligned Status Table for SCM, Parking, MasterUser
-elif role in ["SCM", "Parking", "MasterUser"]:
-    st.subheader("📋 Truck Status Management Table")
+# SCM Section with search filter
+elif role == "SCM":
+    st.subheader("🧾 Quick Truck Status Update Table")
     records = load_data()
+    search_term = st.text_input("🔍 Search by Truck Number").strip().lower()
 
-    search_term = st.text_input("🔍 Search by Truck Number or Material").strip().lower()
-
-    filtered_records = []
-    for record in records:
+    for i, record in enumerate(records):
         fields = record["fields"]
-        truck = fields.get("Truck Number", "").lower()
-        vendor = fields.get("Vendor / Material", "").lower()
-        updated_by = fields.get("Updated By", "")
-        current_status = fields.get("Status", "")
-
-        if role == "SCM" and updated_by != "Gate":
-            continue
-        if role == "Parking" and current_status == "Left (✅)":
-            continue
-
-        if search_term in truck or search_term in vendor:
-            filtered_records.append(record)
-        elif not search_term:
-            filtered_records.append(record)
-
-    if filtered_records:
-        st.markdown("### 🗃️ Matching Records")
-        headers = st.columns([3, 3, 2])
-        headers[0].markdown("**Truck Number**")
-        headers[1].markdown("**Status**")
-        headers[2].markdown("**Action**")
-
-        for i, record in enumerate(filtered_records):
-            fields = record["fields"]
-            record_id = record["id"]
-            truck = fields.get("Truck Number", "")
+        if fields.get("Updated By") == "Gate":
+            truck = fields.get("Truck Number", "Unknown")
+            if search_term and search_term not in truck.lower():
+                continue
             current_status = fields.get("Status", "")
-
-            row = st.columns([3, 3, 2])
-            row[0].markdown(truck)
-
-            if role == "SCM":
-                options = ["Inside (🟡)", "Ready to Leave (🟢)"]
-            elif role == "Parking":
-                options = ["Ready to Leave (🟢)", "Left (✅)"]
-            else:
-                options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
-
-            new_status = row[1].selectbox(
-                label="",
-                options=options,
-                index=options.index(current_status) if current_status in options else 0,
-                key=f"status_{i}"
-            )
-
-            if row[2].button("Update", key=f"update_{i}"):
-                if update_entry_status(record_id, new_status):
-                    st.success(f"{truck} updated to {new_status}")
+            st.markdown(f"**Truck:** {truck} | Current Status: {current_status}")
+            new_status = st.selectbox(f"New Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)"], key=f"{truck}_{i}")
+            if st.button(f"Update {truck}", key=f"update_{i}"):
+                if update_entry_status(record["id"], new_status):
+                    st.success("Status updated.")
                     st.rerun()
                 else:
                     st.error("Update failed.")
-    else:
-        st.info("No matching records found.")
 
-# MasterUser Add + Delete
-if role == "MasterUser":
-    st.subheader("➕ Add New Entry")
-    with st.form("master_add"):
-        date = st.text_input("Date")
-        truck = st.text_input("Truck Number")
-        phone = st.text_input("Driver Phone")
-        entry_time = st.text_input("Entry Time (HH:MM)")
-        vendor = st.text_input("Vendor / Material")
-        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
-        submit = st.form_submit_button("Add Entry")
-        if submit:
-            entry = {
-                "Date": date.strip(),
-                "Truck Number": truck.strip(),
-                "Driver Phone": phone.strip(),
-                "Entry Time": entry_time.strip(),
-                "Vendor / Material": vendor.strip(),
-                "Status": status,
-                "Updated By": role
-            }
-            if add_entry(entry):
-                st.success("Entry added.")
-                st.rerun()
-            else:
-                st.error("All fields required.")
-
-    st.subheader("🗑 Delete Entries")
+# Parking Section
+elif role == "Parking":
+    st.subheader("🚗 Parking - Mark Trucks as Left")
     records = load_data()
+    search_term = st.text_input("🔍 Search by Truck Number").strip().lower()
+    for i, record in enumerate(records):
+        fields = record["fields"]
+        truck = fields.get("Truck Number", "")
+        status = fields.get("Status", "")
+        if status != "Left (✅)":
+            if search_term and search_term not in truck.lower():
+                continue
+            st.markdown(f"**Truck:** {truck} | *Current:* {status}")
+            new_status = st.selectbox(f"Set Status for {truck}", ["Ready to Leave (🟢)", "Left (✅)"], key=f"{truck}_p_{i}")
+            if st.button(f"Update {truck}", key=f"update_p_{i}"):
+                if update_entry_status(record["id"], new_status):
+                    st.success("Status updated.")
+                    st.rerun()
+                else:
+                    st.error("Update failed.")
+
+# MasterUser Full Access
+elif role == "MasterUser":
+    st.subheader("🧠 MasterUser: Full Control")
+    with st.expander("➕ Add New Entry"):
+        with st.form("master_add"):
+            date = st.text_input("Date")
+            truck = st.text_input("Truck Number")
+            phone = st.text_input("Driver Phone")
+            entry_time = st.text_input("Entry Time (HH:MM)")
+            vendor = st.text_input("Vendor / Material")
+            status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+            submit = st.form_submit_button("Add Entry")
+            if submit:
+                entry = {
+                    "Date": date.strip(),
+                    "Truck Number": truck.strip(),
+                    "Driver Phone": phone.strip(),
+                    "Entry Time": entry_time.strip(),
+                    "Vendor / Material": vendor.strip(),
+                    "Status": status,
+                    "Updated By": role
+                }
+                if add_entry(entry):
+                    st.success("Entry added.")
+                    st.rerun()
+                else:
+                    st.error("All fields required.")
+
+    st.subheader("📋 Current Truck Status")
+    records = load_data()
+    search_term = st.text_input("🔍 Search by Truck Number").strip().lower()
     for i, record in enumerate(records):
         fields = record["fields"]
         truck = fields.get("Truck Number", "Unknown")
+        if search_term and search_term not in truck.lower():
+            continue
+        current_status = fields.get("Status", "")
+        st.markdown(f"**Truck:** {truck} | *Status:* {current_status}")
+        new_status = st.selectbox(f"Change Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"], key=f"{record['id']}_m")
+        if st.button(f"Update Status: {truck}", key=f"update_m_{i}"):
+            if update_entry_status(record["id"], new_status):
+                st.success("Status updated.")
+                st.rerun()
+            else:
+                st.error("Failed.")
         if st.button(f"🗑 Delete {truck}", key=f"delete_{i}"):
             if delete_entry(record["id"]):
                 st.success("Deleted successfully.")
@@ -190,6 +182,7 @@ if role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
+    # ✅ Delete All Left Trucks Button
     if st.button("🧹 Delete All 'Left (✅)' Trucks"):
         deleted = 0
         for record in records:
