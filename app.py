@@ -87,90 +87,78 @@ if role == "Gate":
             else:
                 st.error("Failed to add entry. All fields are required.")
 
-# SCM, Parking, MasterUser: Table-Based Status Update
+# Status Table for SCM, Parking, MasterUser
 elif role in ["SCM", "Parking", "MasterUser"]:
-    st.subheader("🔄 Quick Truck Status Update Table")
-    editable_records = []
-    for record in load_data():
-        fields = record.get("fields", {})
-        truck = fields.get("Truck Number", "")
-        updated_by = fields.get("Updated By", "")
-        current_status = fields.get("Status", "")
+    st.subheader("📋 Truck Status Management Table")
+    records = load_data()
+    for i, record in enumerate(records):
+        fields = record["fields"]
         record_id = record["id"]
+        truck = fields.get("Truck Number", "")
+        current_status = fields.get("Status", "")
+        updated_by = fields.get("Updated By", "")
+
         if role == "SCM" and updated_by != "Gate":
             continue
         if role == "Parking" and current_status == "Left (✅)":
             continue
-        editable_records.append({
-            "Record ID": record_id,
-            "Truck Number": truck,
-            "Current Status": current_status,
-            "Select New Status": current_status
-        })
 
-    if editable_records:
-        df = pd.DataFrame(editable_records)
-        for i, row in df.iterrows():
-            st.markdown(f"**Truck:** {row['Truck Number']} | Current Status: {row['Current Status']}")
+        col1, col2, col3 = st.columns([3, 4, 2])
+        with col1:
+            st.markdown(f"**{truck}**")
+        with col2:
             if role == "SCM":
                 options = ["Inside (🟡)", "Ready to Leave (🟢)"]
             elif role == "Parking":
                 options = ["Ready to Leave (🟢)", "Left (✅)"]
             else:
                 options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
-            new_status = st.selectbox(f"New Status for {row['Truck Number']}", options, key=f"status_{i}")
-            if st.button(f"Update {row['Truck Number']}", key=f"btn_{i}"):
-                if update_entry_status(row["Record ID"], new_status):
-                    st.success(f"{row['Truck Number']} status updated.")
+            new_status = st.selectbox(
+                label="",
+                options=options,
+                index=options.index(current_status) if current_status in options else 0,
+                key=f"status_select_{i}"
+            )
+        with col3:
+            if st.button("Update", key=f"update_btn_{i}"):
+                if update_entry_status(record_id, new_status):
+                    st.success(f"{truck} updated to {new_status}")
                     st.rerun()
                 else:
                     st.error("Update failed.")
-    else:
-        st.info("No editable records found for your role.")
 
-# MasterUser Additional Controls
+# MasterUser Add + Delete
 if role == "MasterUser":
-    st.subheader("🧠 MasterUser: Full Control")
-    with st.expander("➕ Add New Entry"):
-        with st.form("master_add"):
-            date = st.text_input("Date")
-            truck = st.text_input("Truck Number")
-            phone = st.text_input("Driver Phone")
-            entry_time = st.text_input("Entry Time (HH:MM)")
-            vendor = st.text_input("Vendor / Material")
-            status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
-            submit = st.form_submit_button("Add Entry")
-            if submit:
-                entry = {
-                    "Date": date.strip(),
-                    "Truck Number": truck.strip(),
-                    "Driver Phone": phone.strip(),
-                    "Entry Time": entry_time.strip(),
-                    "Vendor / Material": vendor.strip(),
-                    "Status": status,
-                    "Updated By": role
-                }
-                if add_entry(entry):
-                    st.success("Entry added.")
-                    st.rerun()
-                else:
-                    st.error("All fields required.")
+    st.subheader("➕ Add New Entry")
+    with st.form("master_add"):
+        date = st.text_input("Date")
+        truck = st.text_input("Truck Number")
+        phone = st.text_input("Driver Phone")
+        entry_time = st.text_input("Entry Time (HH:MM)")
+        vendor = st.text_input("Vendor / Material")
+        status = st.selectbox("Status", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"])
+        submit = st.form_submit_button("Add Entry")
+        if submit:
+            entry = {
+                "Date": date.strip(),
+                "Truck Number": truck.strip(),
+                "Driver Phone": phone.strip(),
+                "Entry Time": entry_time.strip(),
+                "Vendor / Material": vendor.strip(),
+                "Status": status,
+                "Updated By": role
+            }
+            if add_entry(entry):
+                st.success("Entry added.")
+                st.rerun()
+            else:
+                st.error("All fields required.")
 
-    # Full Control View and Delete
-    st.subheader("📋 Current Truck Status")
+    st.subheader("🗑 Delete Entries")
     records = load_data()
     for i, record in enumerate(records):
         fields = record["fields"]
         truck = fields.get("Truck Number", "Unknown")
-        current_status = fields.get("Status", "")
-        st.markdown(f"**Truck:** {truck} | *Status:* {current_status}")
-        new_status = st.selectbox(f"Change Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"], key=f"{record['id']}_m")
-        if st.button(f"Update Status: {truck}", key=f"update_m_{i}"):
-            if update_entry_status(record["id"], new_status):
-                st.success("Status updated.")
-                st.rerun()
-            else:
-                st.error("Failed.")
         if st.button(f"🗑 Delete {truck}", key=f"delete_{i}"):
             if delete_entry(record["id"]):
                 st.success("Deleted successfully.")
