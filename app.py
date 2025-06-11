@@ -87,21 +87,22 @@ if role == "Gate":
             else:
                 st.error("Failed to add entry. All fields are required.")
 
-# SCM Section with search filter
+# SCM Section
 elif role == "SCM":
-    st.subheader("🧾 Quick Truck Status Update Table")
+    st.subheader("🛠 SCM - Status Update (for Gate Entries)")
     records = load_data()
     search_term = st.text_input("🔍 Search by Truck Number").strip().lower()
-
     for i, record in enumerate(records):
         fields = record["fields"]
         if fields.get("Updated By") == "Gate":
             truck = fields.get("Truck Number", "Unknown")
+            date = fields.get("Date", "N/A")
+            entry_time = fields.get("Entry Time", "N/A")
             if search_term and search_term not in truck.lower():
                 continue
             current_status = fields.get("Status", "")
-            st.markdown(f"**Truck:** {truck} | Current Status: {current_status}")
-            new_status = st.selectbox(f"New Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)"], key=f"{truck}_{i}")
+            st.markdown(f"**Truck:** {truck} | **Date:** {date} | **Entry Time:** {entry_time} | *Status:* {current_status}")
+            new_status = st.selectbox(f"Update Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)"], key=f"{truck}_{i}")
             if st.button(f"Update {truck}", key=f"update_{i}"):
                 if update_entry_status(record["id"], new_status):
                     st.success("Status updated.")
@@ -118,10 +119,12 @@ elif role == "Parking":
         fields = record["fields"]
         truck = fields.get("Truck Number", "")
         status = fields.get("Status", "")
+        date = fields.get("Date", "N/A")
+        entry_time = fields.get("Entry Time", "N/A")
         if status != "Left (✅)":
             if search_term and search_term not in truck.lower():
                 continue
-            st.markdown(f"**Truck:** {truck} | *Current:* {status}")
+            st.markdown(f"**Truck:** {truck} | **Date:** {date} | **Entry Time:** {entry_time} | *Current:* {status}")
             new_status = st.selectbox(f"Set Status for {truck}", ["Ready to Leave (🟢)", "Left (✅)"], key=f"{truck}_p_{i}")
             if st.button(f"Update {truck}", key=f"update_p_{i}"):
                 if update_entry_status(record["id"], new_status):
@@ -164,10 +167,12 @@ elif role == "MasterUser":
     for i, record in enumerate(records):
         fields = record["fields"]
         truck = fields.get("Truck Number", "Unknown")
+        date = fields.get("Date", "N/A")
+        entry_time = fields.get("Entry Time", "N/A")
         if search_term and search_term not in truck.lower():
             continue
         current_status = fields.get("Status", "")
-        st.markdown(f"**Truck:** {truck} | *Status:* {current_status}")
+        st.markdown(f"**Truck:** {truck} | **Date:** {date} | **Entry Time:** {entry_time} | *Status:* {current_status}")
         new_status = st.selectbox(f"Change Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"], key=f"{record['id']}_m")
         if st.button(f"Update Status: {truck}", key=f"update_m_{i}"):
             if update_entry_status(record["id"], new_status):
@@ -182,7 +187,6 @@ elif role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
-    # ✅ Delete All Left Trucks Button
     if st.button("🧹 Delete All 'Left (✅)' Trucks"):
         deleted = 0
         for record in records:
