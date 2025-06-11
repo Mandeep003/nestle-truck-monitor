@@ -1,3 +1,4 @@
+
 import streamlit as st 
 from pyairtable import Table
 import os
@@ -87,44 +88,49 @@ if role == "Gate":
             else:
                 st.error("Failed to add entry. All fields are required.")
 
-# SCM Section
-elif role == "SCM":
-    st.subheader("🛠 SCM - Status Update (for Gate Entries)")
-    records = load_data()
-    for i, record in enumerate(records):
-        fields = record["fields"]
-        if fields.get("Updated By") == "Gate":
-            truck = fields.get("Truck Number", "Unknown")
-            current_status = fields.get("Status", "")
-            st.markdown(f"**Truck:** {truck} | *Status:* {current_status}")
-            new_status = st.selectbox(f"Update Status for {truck}", ["Inside (🟡)", "Ready to Leave (🟢)"], key=f"{truck}_{i}")
-            if st.button(f"Update {truck}", key=f"update_{i}"):
-                if update_entry_status(record["id"], new_status):
-                    st.success("Status updated.")
-                    st.rerun()
-                else:
-                    st.error("Update failed.")
-
-# Parking Section
-elif role == "Parking":
-    st.subheader("🚗 Parking - Mark Trucks as Left")
-    records = load_data()
-    for i, record in enumerate(records):
-        fields = record["fields"]
+# SCM, Parking, MasterUser: Table-Based Status Update
+elif role in ["SCM", "Parking", "MasterUser"]:
+    st.subheader("🔄 Quick Truck Status Update Table")
+    editable_records = []
+    for record in load_data():
+        fields = record.get("fields", {})
         truck = fields.get("Truck Number", "")
-        status = fields.get("Status", "")
-        if status != "Left (✅)":
-            st.markdown(f"**Truck:** {truck} | *Current:* {status}")
-            new_status = st.selectbox(f"Set Status for {truck}", ["Ready to Leave (🟢)", "Left (✅)"], key=f"{truck}_p_{i}")
-            if st.button(f"Update {truck}", key=f"update_p_{i}"):
-                if update_entry_status(record["id"], new_status):
-                    st.success("Status updated.")
+        updated_by = fields.get("Updated By", "")
+        current_status = fields.get("Status", "")
+        record_id = record["id"]
+        if role == "SCM" and updated_by != "Gate":
+            continue
+        if role == "Parking" and current_status == "Left (✅)":
+            continue
+        editable_records.append({
+            "Record ID": record_id,
+            "Truck Number": truck,
+            "Current Status": current_status,
+            "Select New Status": current_status
+        })
+
+    if editable_records:
+        df = pd.DataFrame(editable_records)
+        for i, row in df.iterrows():
+            st.markdown(f"**Truck:** {row['Truck Number']} | Current Status: {row['Current Status']}")
+            if role == "SCM":
+                options = ["Inside (🟡)", "Ready to Leave (🟢)"]
+            elif role == "Parking":
+                options = ["Ready to Leave (🟢)", "Left (✅)"]
+            else:
+                options = ["Inside (🟡)", "Ready to Leave (🟢)", "Left (✅)"]
+            new_status = st.selectbox(f"New Status for {row['Truck Number']}", options, key=f"status_{i}")
+            if st.button(f"Update {row['Truck Number']}", key=f"btn_{i}"):
+                if update_entry_status(row["Record ID"], new_status):
+                    st.success(f"{row['Truck Number']} status updated.")
                     st.rerun()
                 else:
                     st.error("Update failed.")
+    else:
+        st.info("No editable records found for your role.")
 
-# MasterUser Full Access
-elif role == "MasterUser":
+# MasterUser Additional Controls
+if role == "MasterUser":
     st.subheader("🧠 MasterUser: Full Control")
     with st.expander("➕ Add New Entry"):
         with st.form("master_add"):
@@ -151,6 +157,7 @@ elif role == "MasterUser":
                 else:
                     st.error("All fields required.")
 
+    # Full Control View and Delete
     st.subheader("📋 Current Truck Status")
     records = load_data()
     for i, record in enumerate(records):
@@ -172,7 +179,6 @@ elif role == "MasterUser":
             else:
                 st.error("Deletion failed.")
 
-    # ✅ Delete All Left Trucks Button
     if st.button("🧹 Delete All 'Left (✅)' Trucks"):
         deleted = 0
         for record in records:
