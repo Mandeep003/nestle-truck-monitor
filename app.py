@@ -10,7 +10,7 @@ AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
 AIRTABLE_TABLE_NAME = os.getenv("AIRTABLE_TABLE_NAME")
 
 # Airtable connection
-airtable = Table(api_key=AIRTABLE_API_KEY, base_id=AIRTABLE_BASE_ID, table_name=AIRTABLE_TABLE_NAME)
+airtable = Table(AIRTABLE_API_KEY, AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME)
 
 # Page config
 st.set_page_config(page_title="Nestlé Truck Monitor", layout="wide")
